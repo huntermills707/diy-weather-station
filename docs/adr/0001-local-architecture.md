@@ -25,20 +25,31 @@ We needed to decide the three core architectural choices before building:
 The ESP32 connects to the LAN over WiFi (with bounded reconnect backoff) and
 POSTs a reading to the ingest service every **five minutes**. Delivery
 failures queue on-device in a bounded backlog, retried oldest-first with
-bounded backoff; overflow policy is observable.
+bounded backoff; overflow policy is observable. Each reading receives a
+device-generated `reading_id` when it is sampled. The ID is stored with the
+queued payload and reused unchanged for every retry. SQLite enforces a unique
+constraint on `(station_id, reading_id)`; the server treats a conflict as a
+successful duplicate submission and returns the existing reading, so a lost
+response cannot create another row and the device can remove the queued item.
 
 ### 2. FastAPI ingest service on a Raspberry Pi
 
 A LAN-only FastAPI application receives readings, validates payloads with
 Pydantic, stores them, and exposes defined error responses and a health
 endpoint. It runs under systemd as a non-root user with journald logging.
-Python tooling is `uv` + `ruff` + `pytest`.
+Reading submissions use a per-station pre-shared token in the HTTP
+`Authorization: Bearer` header. The token is provisioned into the ESP32 during
+device setup and into a root-readable environment file used by the systemd
+service; it is never stored in source control. The service rejects missing or
+invalid credentials with `401 Unauthorized` before validating or storing the
+payload. Python tooling is `uv` + `ruff` + `pytest`.
 
 ### 3. SQLite for storage
 
 Readings are stored in SQLite on the Pi, recording both device and server
-timestamps so clock drift and duplicates can be detected. A nightly backup
-script protects the database.
+timestamps so clock drift and duplicates can be detected. Before production
+deployment, a nightly SQLite backup and regularly tested restore procedure are
+required controls; they are not yet implemented.
 
 ### Cadence and scope exclusions
 
