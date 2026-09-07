@@ -46,9 +46,7 @@ files.
 
 ## Working together
 
-- **Libraries**: libraries installed via the Arduino IDE's Library Manager are
-  invisible to PlatformIO. Add them to `lib_deps` in `platformio.ini` so both
-  builds resolve them.
+- **Libraries**: install each dependency in the Arduino IDE environment and list it in `lib_deps` in `platformio.ini` for PlatformIO. `lib_deps` is not read by Arduino IDE, so keep the library names and compatible versions aligned across both builds.
 - **Flash/partition layout differs between the two builds**: `platformio.ini`
   overrides the board to 16MB flash with `default_16MB.csv` partitions, while
   the Arduino IDE's board definition is fixed at 4MB (there is no Flash Size
