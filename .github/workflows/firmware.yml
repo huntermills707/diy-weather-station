@@ -1,0 +1,58 @@
+name: Firmware
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - firmware/**
+      - platformio.ini
+      - .clang-format
+      - .github/workflows/firmware.yml
+  pull_request:
+    paths:
+      - firmware/**
+      - platformio.ini
+      - .clang-format
+      - .github/workflows/firmware.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache PlatformIO toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Compile firmware
+        run: pio run
+
+      - name: Static analysis
+        run: pio check --fail-on-defect medium
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check clang-format
+        run: |
+          find firmware -type f \( -name '*.ino' -o -name '*.cpp' -o -name '*.h' \) -print0 \
+            | xargs -0 clang-format --dry-run --Werror --assume-filename=sketch.cpp

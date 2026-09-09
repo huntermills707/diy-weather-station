@@ -44,6 +44,27 @@ files.
 6. File → Open → `firmware/firmware.ino`, then Sketch → Upload.
    Serial Monitor: 115200 baud.
 
+## CI and static analysis
+
+The `Firmware` GitHub Actions workflow runs on pushes to `main` and on pull
+requests that touch `firmware/` or `platformio.ini`:
+
+- **Compile**: `pio run` — compilation errors fail the workflow
+- **Static analysis**: `pio check --fail-on-defect medium` (cppcheck, medium+ severity)
+- **Formatting**: `clang-format --dry-run --Werror` against `.clang-format`
+
+Local equivalents:
+
+```sh
+pio run
+pio check --fail-on-defect medium
+find firmware -type f \( -name '*.ino' -o -name '*.cpp' -o -name '*.h' \) \
+  -exec clang-format -i --assume-filename=sketch.cpp {} +
+```
+
+`.ino` files are C++, so C++ tooling applies; `--assume-filename` is needed
+because clang-format does not recognize the `.ino` extension.
+
 ## Working together
 
 - **Libraries**: install each dependency in the Arduino IDE environment and list it in `lib_deps` in `platformio.ini` for PlatformIO. `lib_deps` is not read by Arduino IDE, so keep the library names and compatible versions aligned across both builds.
