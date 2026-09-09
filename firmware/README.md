@@ -57,7 +57,7 @@ Local equivalents:
 
 ```sh
 pio run
-pio check
+pio check --fail-on-defect medium
 find firmware -type f \( -name '*.ino' -o -name '*.cpp' -o -name '*.h' \) \
   -exec clang-format -i --assume-filename=sketch.cpp {} +
 ```
