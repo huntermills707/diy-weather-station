@@ -10,7 +10,7 @@ const int LED_PIN = LED_BUILTIN;  // GPIO 2
  */
 void setup() {
     Serial.begin(115200);
-    delay(1000);              // let USB-serial settle before first print
+    delay(1000);  // let USB-serial settle before first print
     Serial.println("MicroMod ESP32 up");
 
     pinMode(LED_PIN, OUTPUT);
