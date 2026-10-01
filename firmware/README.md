@@ -44,6 +44,49 @@ files.
 6. File → Open → `firmware/firmware.ino`, then Sketch → Upload.
    Serial Monitor: 115200 baud.
 
+## Hardware pin map (MicroMod Weather Carrier + ESP32)
+
+| Sensor        | Carrier signal | ESP32 GPIO | Interface |
+| ------------- | -------------- | ---------- | --------- |
+| Rain gauge    | D1 (RJ11)      | 27         | digital, falling-edge interrupt |
+| Anemometer    | D0 (RJ11)      | 14         | digital, falling-edge interrupt |
+| Wind vane     | A1 (RJ11)      | 35         | 12-bit ADC, 10k pull-up to 3.3V |
+| BME280        | Qwiic I2C      | 21/22      | I2C address 0x77 |
+
+The carrier puts 43k pull-ups and 0.1uF RC filters on the rain and wind-speed
+lines, so firmware uses plain `INPUT` and only a short software debounce
+(rain 100 ms — bench-measured phantom edges arrive 18-34 ms after a real tip;
+wind 5 ms) to reject reed-switch bounce and mechanical settling. The soil
+moisture terminal (A0/G0) is not used.
+
+## Units and conversion constants (SparkFun Weather Meter Kit, SEN-08942)
+
+- Rain: **0.2794 mm per bucket tip** (0.011 in)
+- Wind speed: **2.4 km/h per closure per second** (1.492 mph/Hz). Average uses
+  the closure count over the sample window; peak uses the shortest interval
+  between two closures in the window (reported as the average when there are
+  fewer than two closures).
+- Wind direction: the vane is a resistor ladder read against the 10k pull-up.
+  The 16 reference ADC values in `weather_meters.cpp` were calibrated on the
+  assembled unit by sweeping the vane through a full revolution (even headings
+  measured directly, odd headings measured or modelled as parallel-resistor
+  combinations of their neighbours), and agree within 5-8% with SparkFun's
+  experimental ESP32 constants in the Weather Meter Kit library. Re-calibrate
+  with the `c` serial command if the hardware changes. Readings that fall in
+  the dead zone between reference bands report `unknown`; 67.5 and 90 degrees
+  are only 26 ADC counts apart and can flip in noise — a hardware limitation.
+
+## Serial output and commands (115200 baud)
+
+- `report ...` every five minutes (ADR 0001 cadence): rain tips/mm for the
+  window, cumulative tips, wind average/peak km/h, direction, BME280
+  temperature/pressure/humidity. Invalid sensor states print explicitly
+  (`bme280=error`, `wind_dir_deg=unknown`) instead of fabricated values.
+- `event: rain tip #N` prints immediately on each debounced tip; wind closures
+  print once per second while the anemometer is turning.
+- Commands: `s` = print a sample report now (resets the window),
+  `c` = toggle vane calibration stream, `h` = help.
+
 ## CI and static analysis
 
 The `Firmware` GitHub Actions workflow runs on pushes to `main` and on pull
