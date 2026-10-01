@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local session notes (working state between AI/pairing sessions)
+/session-notes.md
