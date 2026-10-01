@@ -100,6 +100,11 @@ WindRainWindow windRainTakeWindow() {
     rainWindow = 0;
     windWindow = 0;
     windMinInterval = 0;
+    // Clear the last-pulse timestamp too: intervals must be measured only
+    // between closures within this window, otherwise a lone closure would
+    // inherit a minutes-long stale gap from the previous window and violate
+    // the "windMinIntervalMs == 0 means fewer than two closures" contract.
+    windLastPulseMs = 0;
     interrupts();
 
     uint32_t now = millis();

@@ -87,6 +87,12 @@ static void handleSerial() {
                 break;
             case 'c':
                 vaneCalMode = !vaneCalMode;
+                if (vaneCalMode) {
+                    // Refresh the schedule so the stream starts promptly even
+                    // after long uptime (stale 0 goes negative past 24.8 days
+                    // under the wrap-safe comparison).
+                    nextCalPrintAt = millis();
+                }
                 Serial.println(vaneCalMode ? "vane calibration on" : "vane calibration off");
                 break;
             case 'h':
