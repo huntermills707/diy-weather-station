@@ -86,6 +86,11 @@ uint32_t rainTipsTotal() { return rainTotal; }
 uint32_t windClosuresTotal() { return windTotal; }
 
 WindRainWindow windRainTakeWindow() {
+    // On dual-core ESP32, noInterrupts() only masks interrupts on the calling
+    // core. That suffices here only because the ISRs and this function both
+    // run on the Arduino core (attached from setup(), called from loop()); a
+    // future FreeRTOS task calling this from the other core would need a real
+    // critical section instead.
     noInterrupts();
     WindRainWindow w;
     w.rainTips = rainWindow;

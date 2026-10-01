@@ -46,8 +46,9 @@ static void printReport() {
     float windDir = windDirectionDeg();
 
     Serial.printf("report t=%lu window_s=%lu rain_tips=%lu rain_mm=%.2f rain_total=%lu ",
-                  (unsigned long)millis(), (unsigned long)(w.durationMs / 1000), w.rainTips,
-                  w.rainTips * RAIN_MM_PER_TIP, w.rainTipsTotal);
+                  (unsigned long)millis(), (unsigned long)(w.durationMs / 1000),
+                  (unsigned long)w.rainTips, w.rainTips * RAIN_MM_PER_TIP,
+                  (unsigned long)w.rainTipsTotal);
     Serial.printf("wind_avg_kmh=%.1f wind_peak_kmh=%.1f ", windAvgKmh, windPeakKmh);
     if (windDir >= 0.0f) {
         Serial.printf("wind_dir_deg=%.1f ", windDir);
@@ -122,7 +123,10 @@ void loop() {
 
     uint32_t now = millis();
 
-    if (now >= nextWindPrintAt) {
+    // All three schedulers use signed-difference comparisons so millis()
+    // rollover (~49.7 days) doesn't stall reporting — same wrap-safe pattern
+    // the ISRs already use for debounce.
+    if ((int32_t)(now - nextWindPrintAt) >= 0) {
         nextWindPrintAt = now + LIVE_WIND_PRINT_MS;
         uint32_t windNow = windClosuresTotal();
         uint32_t delta = windNow - lastWindSeen;
@@ -133,7 +137,7 @@ void loop() {
         }
     }
 
-    if (vaneCalMode && now >= nextCalPrintAt) {
+    if (vaneCalMode && (int32_t)(now - nextCalPrintAt) >= 0) {
         nextCalPrintAt = now + VANE_CAL_PRINT_MS;
         int adc = windDirectionRawAdc();
         float deg = windDirectionDeg();
@@ -144,7 +148,7 @@ void loop() {
         }
     }
 
-    if (now >= nextWindowAt) {
+    if ((int32_t)(now - nextWindowAt) >= 0) {
         printReport();
     }
 }
