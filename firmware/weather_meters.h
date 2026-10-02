@@ -2,18 +2,14 @@
 
 #include <Arduino.h>
 
+#include "calibration.h"
+
 // Pin mapping for the SparkFun MicroMod Weather Carrier Board + ESP32
 // processor, per the esp32micromod variant pins_arduino.h (NOT the weather
 // carrier hookup-guide sketch, which wrongly uses GPIO 23 for D0).
 constexpr uint8_t PIN_RAIN = 27;    // carrier D1, RJ11 "RAIN" jack
 constexpr uint8_t PIN_WSPEED = 14;  // carrier D0, RJ11 "WIND" jack
 constexpr uint8_t PIN_WDIR = 35;    // carrier A1, RJ11 "WIND" jack (analog ladder)
-
-// Conversion constants for the SparkFun Weather Meter Kit (SEN-08942
-// datasheet): one bucket tip is 0.011" of rain, and one anemometer closure
-// per second corresponds to 2.4 km/h (1.492 mph).
-constexpr float RAIN_MM_PER_TIP = 0.2794f;
-constexpr float WIND_KMH_PER_HZ = 2.4f;
 
 // Software debounce windows. Both digital lines already have hardware RC
 // filtering on the carrier (43k pull-up + 0.1uF to ground), but bench testing
@@ -43,9 +39,9 @@ uint32_t windClosuresTotal();
 // duration is measured from the previous call (or from init).
 WindRainWindow windRainTakeWindow();
 
-// Median-filtered wind vane heading in degrees (0/22.5/.../337.5), or -1.0f
-// when the ADC reading falls outside every reference band.
-float windDirectionDeg();
-
-// Raw ADC count (0..4095) for vane calibration.
+// Averaged raw vane ADC count (0..4095); used for field calibration.
 int windDirectionRawAdc();
+
+// Heading in degrees (closest VANE_ADC entry plus VANE_OFFSET_DEG), or -1.0f
+// when the vane reads open circuit (unplugged) or shorted to ground.
+float windDirectionDeg(int rawAdc);
