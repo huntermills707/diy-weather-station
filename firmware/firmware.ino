@@ -52,7 +52,6 @@ static void printReport() {
         w.windMinIntervalMs > 0 ? WIND_KMH_PER_HZ * 1000.0f / w.windMinIntervalMs : windAvgKmh;
 
     float windDir = windDirectionDeg(windDirectionRawAdc());
-    int soilRaw = soilMoistureRawAdc();
 
     Serial.printf("report t=%lu window_s=%lu rain_tips=%lu rain_mm=%.2f rain_total=%lu ",
                   (unsigned long)millis(), (unsigned long)(w.durationMs / 1000),
@@ -63,11 +62,6 @@ static void printReport() {
         Serial.printf("wind_dir_deg=%.1f ", windDir);
     } else {
         Serial.print("wind_dir_deg=unknown ");
-    }
-    if (soilRaw >= 0) {
-        Serial.printf("soil_raw=%d soil_pct=%.0f ", soilRaw, soilMoisturePct(soilRaw));
-    } else {
-        Serial.print("soil=unknown ");
     }
 
     if (!bme280Ok) {
@@ -161,11 +155,10 @@ void loop() {
         nextCalPrintAt = now + CAL_PRINT_MS;
         int vaneAdc = windDirectionRawAdc();
         float deg = windDirectionDeg(vaneAdc);
-        int soilRaw = soilMoistureRawAdc();
         if (deg >= 0.0f) {
-            Serial.printf("cal vane_adc=%d dir=%.1f soil_raw=%d\n", vaneAdc, deg, soilRaw);
+            Serial.printf("cal vane_adc=%d dir=%.1f\n", vaneAdc, deg);
         } else {
-            Serial.printf("cal vane_adc=%d dir=unknown soil_raw=%d\n", vaneAdc, soilRaw);
+            Serial.printf("cal vane_adc=%d dir=unknown\n", vaneAdc);
         }
     }
 

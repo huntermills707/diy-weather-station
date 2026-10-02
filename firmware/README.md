@@ -5,7 +5,7 @@ PlatformIO and the Arduino framework.
 
 Responsibilities:
 
-- Read sensors (BME280, rain gauge, anemometer, wind vane, soil moisture)
+- Read sensors (BME280, rain gauge, anemometer, wind vane)
 - Connect to WiFi with bounded retry/backoff
 - POST readings to the FastAPI ingest service over the LAN every five minutes
 - Queue failed uploads to a bounded backlog and retry oldest-first
@@ -67,12 +67,12 @@ cp firmware/secrets.example.h firmware/secrets.h
 | Anemometer    | D0 (RJ11)      | 14         | digital, falling-edge interrupt |
 | Wind vane     | A1 (RJ11)      | 35         | 12-bit ADC, 10k pull-up to 3.3V |
 | BME280        | Qwiic I2C      | 21/22      | I2C address 0x77 |
-| Soil moisture | A0 (SIG), G0 (VCC) | 34, 15 | 12-bit ADC; probe powered only while sampling |
 
 The carrier puts 43k pull-ups and 0.1uF RC filters on the rain and wind-speed
 lines, so firmware uses plain `INPUT` and only a short software debounce
 (rain 100 ms — bench-measured phantom edges arrive 18-34 ms after a real tip;
-wind 5 ms) to reject reed-switch bounce and mechanical settling.
+wind 5 ms) to reject reed-switch bounce and mechanical settling. The soil
+moisture terminal (A0/G0) is not used: soil moisture is out of scope.
 
 ## Units and calibration
 
@@ -83,13 +83,13 @@ are in [docs/sensors.md](../docs/sensors.md). Every tunable value lives in
 ## Serial output and commands (115200 baud)
 
 - `report ...` every five minutes (ADR 0001 cadence): rain, wind, vane
-  direction, soil moisture, and BME280 fields (see docs/sensors.md). Invalid
-  sensor states print explicitly (`bme280=error`, `wind_dir_deg=unknown`,
-  `soil=unknown`) instead of fabricated values.
+  direction, and BME280 fields (see docs/sensors.md). Invalid sensor states
+  print explicitly (`bme280=error`, `wind_dir_deg=unknown`) instead of
+  fabricated values.
 - `event: rain tip #N` prints immediately on each debounced tip; wind closures
   print once per second while the anemometer is turning.
 - Commands: `s` = print a sample report now (resets the window),
-  `c` = toggle the calibration stream (raw vane ADC, heading, raw soil),
+  `c` = toggle the calibration stream (raw vane ADC and heading),
   `h` = help.
 - `scripts/serial_capture.py` captures this output with host UTC timestamps.
 

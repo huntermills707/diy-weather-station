@@ -37,13 +37,3 @@ constexpr int VANE_ADC[16] = {
 // Added to the vane heading, for a station mounted with its "N" mark not
 // facing true north (e.g. N mark faces east -> 90).
 constexpr float VANE_OFFSET_DEG = 0.0f;
-
-// Soil moisture: set true once a probe is plugged in. With no probe the
-// input floats and can read anything, so it is reported as unknown.
-constexpr bool SOIL_PROBE_INSTALLED = false;
-
-// Soil moisture: raw ADC with the probe in dry air/soil and in water. The
-// reported percentage is a straight line between the two. The defaults span
-// the full ADC range until measured in the field.
-constexpr int SOIL_DRY_ADC = 0;
-constexpr int SOIL_WET_ADC = 4095;

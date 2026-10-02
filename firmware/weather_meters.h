@@ -7,11 +7,9 @@
 // Pin mapping for the SparkFun MicroMod Weather Carrier Board + ESP32
 // processor, per the esp32micromod variant pins_arduino.h (NOT the weather
 // carrier hookup-guide sketch, which wrongly uses GPIO 23 for D0).
-constexpr uint8_t PIN_RAIN = 27;      // carrier D1, RJ11 "RAIN" jack
-constexpr uint8_t PIN_WSPEED = 14;    // carrier D0, RJ11 "WIND" jack
-constexpr uint8_t PIN_WDIR = 35;      // carrier A1, RJ11 "WIND" jack (analog ladder)
-constexpr uint8_t PIN_SOIL = 34;      // carrier A0, soil moisture SIG
-constexpr uint8_t PIN_SOIL_PWR = 15;  // carrier G0, soil moisture VCC (on only while sampling)
+constexpr uint8_t PIN_RAIN = 27;    // carrier D1, RJ11 "RAIN" jack
+constexpr uint8_t PIN_WSPEED = 14;  // carrier D0, RJ11 "WIND" jack
+constexpr uint8_t PIN_WDIR = 35;    // carrier A1, RJ11 "WIND" jack (analog ladder)
 
 // Software debounce windows. Both digital lines already have hardware RC
 // filtering on the carrier (43k pull-up + 0.1uF to ground), but bench testing
@@ -47,10 +45,3 @@ int windDirectionRawAdc();
 // Heading in degrees (closest VANE_ADC entry plus VANE_OFFSET_DEG), or -1.0f
 // when the vane reads open circuit (unplugged).
 float windDirectionDeg(int rawAdc);
-
-// Powers the soil probe, reads it, and powers it off again. Raw ADC 0..4095,
-// or -1 when no probe is installed or it reads as unplugged.
-int soilMoistureRawAdc();
-
-// Raw soil reading mapped between SOIL_DRY_ADC and SOIL_WET_ADC, 0..100.
-float soilMoisturePct(int rawAdc);

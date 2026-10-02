@@ -4,13 +4,6 @@
 // (vane unplugged): only the 10k pull-up is left.
 constexpr int VANE_OPEN_CIRCUIT_ADC = 4090;
 
-// Settle time for the soil probe after powering it, as in SparkFun's example.
-constexpr uint32_t SOIL_SETTLE_MS = 10;
-
-// With its power off, a connected probe pulls SIG near 0. A higher reading
-// means the probe has come unplugged and the input is floating.
-constexpr int SOIL_UNPOWERED_MAX_ADC = 200;
-
 static volatile uint32_t rainTotal = 0;
 static volatile uint32_t rainLastEdgeMs = 0;
 static volatile uint32_t rainWindow = 0;
@@ -56,13 +49,9 @@ void weatherMetersInit() {
     pinMode(PIN_RAIN, INPUT);
     pinMode(PIN_WSPEED, INPUT);
     pinMode(PIN_WDIR, INPUT);
-    pinMode(PIN_SOIL, INPUT);
-    pinMode(PIN_SOIL_PWR, OUTPUT);
-    digitalWrite(PIN_SOIL_PWR, LOW);  // probe corrodes if left powered
 
     analogReadResolution(12);
     analogSetPinAttenuation(PIN_WDIR, ADC_11db);
-    analogSetPinAttenuation(PIN_SOIL, ADC_11db);
 
     attachInterrupt(digitalPinToInterrupt(PIN_RAIN), rainIsr, FALLING);
     attachInterrupt(digitalPinToInterrupt(PIN_WSPEED), windIsr, FALLING);
@@ -124,20 +113,4 @@ float windDirectionDeg(int rawAdc) {
         }
     }
     return fmodf(best * 22.5f + VANE_OFFSET_DEG + 360.0f, 360.0f);
-}
-
-int soilMoistureRawAdc() {
-    if (!SOIL_PROBE_INSTALLED || analogRead(PIN_SOIL) > SOIL_UNPOWERED_MAX_ADC) {
-        return -1;
-    }
-    digitalWrite(PIN_SOIL_PWR, HIGH);
-    delay(SOIL_SETTLE_MS);
-    int raw = analogRead(PIN_SOIL);
-    digitalWrite(PIN_SOIL_PWR, LOW);
-    return raw;
-}
-
-float soilMoisturePct(int rawAdc) {
-    float pct = 100.0f * (rawAdc - SOIL_DRY_ADC) / (SOIL_WET_ADC - SOIL_DRY_ADC);
-    return constrain(pct, 0.0f, 100.0f);
 }
