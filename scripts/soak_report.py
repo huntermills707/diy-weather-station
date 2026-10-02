@@ -39,6 +39,8 @@ def main() -> int:
     parser.add_argument("--hours", type=float, default=24, help="length of the window (24)")
     parser.add_argument("--station", default="station-1")
     args = parser.parse_args()
+    if args.hours * 3600 < CADENCE_S:
+        parser.error(f"--hours must cover at least one {CADENCE_S} s reading interval")
 
     end_default = datetime.now(UTC)
     start = parse_utc(args.since) if args.since else end_default - timedelta(hours=args.hours)

@@ -79,9 +79,11 @@ async def health(request: Request) -> JSONResponse:
     """Liveness probe: the service is up and its database is readable."""
     try:
         await run_in_threadpool(db.check_db, request.app.state.db_path)
-    except sqlite3.Error as exc:
+    except sqlite3.Error:
+        # Details go to the log, not to unauthenticated callers.
+        log.exception("health check failed")
         return JSONResponse(
-            {"status": "error", "detail": f"database: {exc}"},
+            {"status": "error", "detail": "Database unavailable"},
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     return JSONResponse({"status": "ok"})

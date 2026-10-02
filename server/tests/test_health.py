@@ -15,7 +15,8 @@ def test_health_reports_unreadable_database(client: TestClient, db_path: Path) -
     db_path.unlink()
     response = client.get("/health")
     assert response.status_code == 503
-    assert response.json()["status"] == "error"
+    # Generic message only: SQLite's error text stays in the server log.
+    assert response.json() == {"status": "error", "detail": "Database unavailable"}
 
 
 def test_startup_creates_database(client: TestClient, db_path: Path) -> None:
