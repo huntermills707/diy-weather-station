@@ -51,8 +51,10 @@ Notes on the design:
   with SQLite's date functions (`unixepoch(received_at)`, `date(...)`).
 - **Deduplication.** `UNIQUE (station_id, reading_id)` stores a retried
   reading only once.
-- **WAL journal mode**, so readers such as Grafana or the `sqlite3` CLI never
-  block the ingest service.
+- **Rollback journal (SQLite's default), not WAL.** In WAL mode every reader
+  must be able to write the `-shm` side file. Then Grafana, which only has
+  read permission, could not open the database. A reader can briefly delay a
+  write, but the 5 s busy timeout covers that at one write per five minutes.
 - `PRAGMA user_version` records the schema version (currently 1). A future
   schema change updates the version and migrates from it.
 

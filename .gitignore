@@ -224,7 +224,6 @@ __marimo__/
 /firmware/secrets.h
 server/.env
 
-# Local reading databases (docs/database.md), including WAL side files
+# Local reading databases (docs/database.md)
 *.db
-*.db-wal
-*.db-shm
+*.db-journal

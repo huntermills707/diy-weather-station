@@ -200,7 +200,7 @@ def test_init_db_is_idempotent(db_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     try:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
-        assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
     finally:
         conn.close()
 

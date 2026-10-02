@@ -57,7 +57,10 @@ def init_db(path: str) -> None:
             raise RuntimeError(
                 f"{path} has schema version {version}, newer than this server ({SCHEMA_VERSION})"
             )
-        conn.execute("PRAGMA journal_mode=WAL")
+        # Rollback journal, not WAL: WAL readers must write the -shm file, so
+        # read-only users such as Grafana could not open the database. At one
+        # write per five minutes, WAL's concurrency gain doesn't matter.
+        conn.execute("PRAGMA journal_mode=DELETE")
         conn.executescript(SCHEMA)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         conn.commit()

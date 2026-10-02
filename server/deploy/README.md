@@ -88,6 +88,52 @@ curl -s <pi-address>:8000/health              # from another machine on the LAN
 journalctl -u weather-station -b              # this boot's logs
 ```
 
+## Grafana charts
+
+Grafana reads the SQLite file directly, read-only, through the
+[frser-sqlite-datasource](https://grafana.com/grafana/plugins/frser-sqlite-datasource/)
+plugin. Its datasource and dashboard are provisioned from
+[`server/grafana/`](../grafana), so they are versioned and `git pull` picks up
+dashboard changes.
+
+```sh
+# 1. Grafana OSS from Grafana's apt repository (arm64 and armhf builds)
+sudo apt install -y apt-transport-https gnupg wget
+sudo mkdir -p /etc/apt/keyrings
+wget -qO - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg >/dev/null
+echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" \
+  | sudo tee /etc/apt/sources.list.d/grafana.list
+sudo apt update && sudo apt install -y grafana
+
+# 2. SQLite plugin, and read access to the database through the group
+sudo grafana cli --homepath /usr/share/grafana --pluginsDir /var/lib/grafana/plugins \
+  plugins install frser-sqlite-datasource
+sudo chown -R grafana:grafana /var/lib/grafana/plugins
+sudo adduser grafana weather-station
+
+# 3. Provisioning (copies; re-copy if these two files change)
+sudo cp /opt/weather-station/server/grafana/provisioning/datasources/weather-station.yaml \
+  /etc/grafana/provisioning/datasources/
+sudo cp /opt/weather-station/server/grafana/provisioning/dashboards/weather-station.yaml \
+  /etc/grafana/provisioning/dashboards/
+sudo systemctl enable --now grafana-server
+```
+
+Open `http://<pi-address>:3000`. The first login is `admin` / `admin`, and
+Grafana asks for a new password. Open the **Weather station** dashboard. Like
+port 8000, port 3000 must stay LAN-only.
+
+The dashboard shows temperature, humidity, pressure, wind, rain, the minutes
+between readings, and a table of the latest rows. Missing readings break the
+lines. A sensor error stored as NULL also leaves a gap. The interval panel
+shows a gap as a spike above 5 minutes. To check a point against the
+database, compare it with the table, or query the row with `sqlite3`.
+Chart times use the station's NTP time (`device_time`), falling back to the
+server's `received_at`, and display in the browser's time zone.
+
+The database uses SQLite's rollback journal rather than WAL so this
+read-only access works (see [docs/database.md](../../docs/database.md)).
+
 ## Changing the token
 
 Edit `/etc/weather-station/env` (`sudo nano /etc/weather-station/env`), then

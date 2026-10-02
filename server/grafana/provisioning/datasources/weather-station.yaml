@@ -1,0 +1,13 @@
+# Grafana datasource for the ingest service's SQLite file (docs/database.md).
+# Needs the frser-sqlite-datasource plugin; install steps: server/deploy/README.md.
+apiVersion: 1
+datasources:
+  - name: Weather station
+    uid: weather-station-sqlite
+    type: frser-sqlite-datasource
+    isDefault: true
+    editable: false
+    jsonData:
+      path: /var/lib/weather-station/weather.db
+      # Read-only: Grafana must never write to the readings database.
+      pathOptions: mode=ro

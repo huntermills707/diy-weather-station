@@ -1,0 +1,380 @@
+{
+  "uid": "weather-station",
+  "title": "Weather station",
+  "tags": [
+    "weather"
+  ],
+  "timezone": "browser",
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "description": "Readings from the ingest service's SQLite database (docs/database.md). Times are the station's NTP clock, or the server's receive time when the station was unsynced.",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Temperature",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "weather-station-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "weather-station-sqlite"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, temp_c AS \"Temperature\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "queryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, temp_c AS \"Temperature\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "insertNulls": 600000
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 1
+    },
+    {
+      "type": "timeseries",
+      "title": "Relative humidity",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "weather-station-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "weather-station-sqlite"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, rh_pct AS \"Humidity\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "queryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, rh_pct AS \"Humidity\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "humidity",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "insertNulls": 600000
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 2
+    },
+    {
+      "type": "timeseries",
+      "title": "Station pressure",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "weather-station-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "weather-station-sqlite"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, press_hpa AS \"Pressure\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "queryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, press_hpa AS \"Pressure\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pressurehpa",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "insertNulls": 600000
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 3
+    },
+    {
+      "type": "timeseries",
+      "title": "Wind",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "weather-station-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "weather-station-sqlite"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, wind_avg_kmh AS \"Average\", wind_peak_kmh AS \"Gust\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "queryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, wind_avg_kmh AS \"Average\", wind_peak_kmh AS \"Gust\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "velocitykmh",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "insertNulls": 600000
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 4
+    },
+    {
+      "type": "timeseries",
+      "title": "Rain per reading",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "weather-station-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "weather-station-sqlite"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, rain_mm AS \"Rain\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "queryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, rain_mm AS \"Rain\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix:mm",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": false,
+            "insertNulls": 600000
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "Minutes between readings (5 = on cadence; spikes are gaps)",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "weather-station-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "weather-station-sqlite"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT time, (time - lag(time) OVER (ORDER BY time)) / 60.0 AS \"Interval\" FROM (SELECT unixepoch(COALESCE(device_time, received_at)) AS time FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000) ORDER BY time",
+          "queryText": "SELECT time, (time - lag(time) OVER (ORDER BY time)) / 60.0 AS \"Interval\" FROM (SELECT unixepoch(COALESCE(device_time, received_at)) AS time FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000) ORDER BY time",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "insertNulls": false
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "Time since the previous stored reading. A steady 5 means none are missing; a spike of N means about N/5 - 1 readings were lost.",
+      "id": 6
+    },
+    {
+      "type": "table",
+      "title": "Latest readings",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "weather-station-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 10
+      },
+      "description": "Raw rows, newest first, for checking chart points against the database.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "weather-station-sqlite"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT id, reading_id, device_time, received_at, temp_c, rh_pct, press_hpa, wind_avg_kmh, wind_peak_kmh, wind_dir_deg, rain_mm, bme280, rssi_dbm FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY unixepoch(COALESCE(device_time, received_at)) DESC LIMIT 50",
+          "queryText": "SELECT id, reading_id, device_time, received_at, temp_c, rh_pct, press_hpa, wind_avg_kmh, wind_peak_kmh, wind_dir_deg, rain_mm, bme280, rssi_dbm FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY unixepoch(COALESCE(device_time, received_at)) DESC LIMIT 50",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "id": 7
+    }
+  ]
+}
