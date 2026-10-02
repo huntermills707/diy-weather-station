@@ -6,10 +6,9 @@ on:
     paths:
       - server/**
       - .github/workflows/python.yml
+  # No path filter on PRs: this job is a required status check on main, so it
+  # must run on every pull request regardless of what it touches.
   pull_request:
-    paths:
-      - server/**
-      - .github/workflows/python.yml
 
 jobs:
   lint-and-test:

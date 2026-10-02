@@ -4,6 +4,14 @@
 
 #include "weather_meters.h"
 
+// WiFi credentials and ingest token live in the gitignored secrets.h
+// (issue #23); copy secrets.example.h and fill in real values.
+#if __has_include("secrets.h")
+#include "secrets.h"
+#else
+#error "firmware/secrets.h missing: copy secrets.example.h to secrets.h and fill in your values"
+#endif
+
 // Collection cadence per ADR 0001: one reading every five minutes.
 constexpr uint32_t SAMPLE_WINDOW_MS = 5UL * 60UL * 1000UL;
 constexpr uint32_t LIVE_WIND_PRINT_MS = 1000;

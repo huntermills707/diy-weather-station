@@ -27,8 +27,28 @@ uv run uvicorn weather_station_server.main:app --reload  # dev server
 exact environment. On the Raspberry Pi, run the service under systemd as a
 non-root user with journald logging.
 
+## Configuration
+
+Secrets are read from the environment and never committed (issue #23). The
+service refuses to start without them:
+
+- `WEATHER_STATION_INGEST_TOKEN` — per-station pre-shared token that
+  stations send as `Authorization: Bearer` (ADR 0001). Must match
+  `INGEST_TOKEN` in the station's `firmware/secrets.h`.
+
+For local development, copy `.env.example` to `.env` (gitignored), fill in a
+token, and load it before starting the service:
+
+```sh
+cp .env.example .env   # then edit .env
+set -a; . ./.env; set +a
+```
+
+On the Pi, the same variables live in a root-readable `EnvironmentFile`
+referenced by the systemd unit (ADR 0001) instead of `.env`.
+
 ## CI
 
-The `Python` GitHub Actions workflow runs on pushes to `main` and on pull
-requests that touch `server/`: `uv sync --locked`, `ruff check`,
+The `Python` GitHub Actions workflow runs on every pull request and on
+pushes to `main` that touch `server/`: `uv sync --locked`, `ruff check`,
 `ruff format --check`, and `pytest`.
