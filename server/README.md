@@ -28,8 +28,8 @@ uv run uvicorn weather_station_server.main:app --reload  # dev server
 ```
 
 `uv.lock` is committed — use `uv sync --locked` (as CI does) to reproduce the
-exact environment. On the Raspberry Pi, run the service under systemd as a
-non-root user with journald logging.
+exact environment. On the Raspberry Pi the service runs under systemd as a
+non-root user with journald logging: see [deploy/README.md](deploy/README.md).
 
 ## Configuration
 
