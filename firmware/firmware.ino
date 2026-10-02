@@ -1,16 +1,14 @@
 #include <Arduino.h>
 #include <SparkFunBME280.h>
 #include <Wire.h>
+#include <esp_random.h>
 
+#include "network.h"
+#include "reading.h"
 #include "weather_meters.h"
 
-// WiFi credentials and ingest token live in the gitignored secrets.h
-// (issue #23); copy secrets.example.h and fill in real values.
-#if __has_include("secrets.h")
-#include "secrets.h"
-#else
-#error "firmware/secrets.h missing: copy secrets.example.h to secrets.h and fill in your values"
-#endif
+// Identifies this station's readings on the server (docs/ingest-api.md).
+constexpr char STATION_ID[] = "station-1";
 
 // Collection cadence per ADR 0001: one reading every five minutes.
 constexpr uint32_t SAMPLE_WINDOW_MS = 5UL * 60UL * 1000UL;
@@ -20,6 +18,12 @@ constexpr uint32_t CAL_PRINT_MS = 500;
 BME280 bme280;
 bool bme280Ok = false;
 bool calMode = false;
+
+// reading_id = "<bootId>-<readingSeq>": random per boot, counting per reading,
+// so retries reuse it and gaps or reboots show up on the server.
+uint32_t bootId = 0;
+uint32_t readingSeq = 0;
+uint32_t uploadFailures = 0;
 
 uint32_t nextWindowAt = 0;
 uint32_t nextWindPrintAt = 0;
@@ -38,48 +42,99 @@ static bool plausible(float tempC, float pressPa, float rh) {
            rh >= 0.0f && rh <= 100.0f;
 }
 
-static void printReport() {
+// Closes the current rain/wind window and samples every sensor.
+static Reading takeReading() {
     WindRainWindow w = windRainTakeWindow();
     nextWindowAt = millis() + SAMPLE_WINDOW_MS;
 
-    float windAvgKmh = 0.0f;
+    Reading r = {};
+    snprintf(r.readingId, sizeof(r.readingId), "%08lx-%lu", (unsigned long)bootId,
+             (unsigned long)++readingSeq);
+    formatUtcNow(r.deviceTime, sizeof(r.deviceTime));
+    r.uptimeMs = millis();
+    // Rounded, and at least 1 s so an immediate `s` still sends a valid window.
+    r.windowS = max<uint32_t>(1, (w.durationMs + 500) / 1000);
+    r.rainTips = w.rainTips;
+    r.rainTipsTotal = w.rainTipsTotal;
+    r.rainMm = w.rainTips * RAIN_MM_PER_TIP;
+
     if (w.durationMs > 0) {
-        windAvgKmh = w.windClosures * WIND_KMH_PER_HZ * 1000.0f / w.durationMs;
+        r.windAvgKmh = w.windClosures * WIND_KMH_PER_HZ * 1000.0f / w.durationMs;
     }
     // With fewer than two closures in the window there is no measurable
     // interval, so peak falls back to the (near-zero) average.
-    float windPeakKmh =
-        w.windMinIntervalMs > 0 ? WIND_KMH_PER_HZ * 1000.0f / w.windMinIntervalMs : windAvgKmh;
-
-    float windDir = windDirectionDeg(windDirectionRawAdc());
-
-    Serial.printf("report t=%lu window_s=%lu rain_tips=%lu rain_mm=%.2f rain_total=%lu ",
-                  (unsigned long)millis(), (unsigned long)(w.durationMs / 1000),
-                  (unsigned long)w.rainTips, w.rainTips * RAIN_MM_PER_TIP,
-                  (unsigned long)w.rainTipsTotal);
-    Serial.printf("wind_avg_kmh=%.1f wind_peak_kmh=%.1f ", windAvgKmh, windPeakKmh);
-    if (windDir >= 0.0f) {
-        Serial.printf("wind_dir_deg=%.1f ", windDir);
-    } else {
-        Serial.print("wind_dir_deg=unknown ");
-    }
+    r.windPeakKmh =
+        w.windMinIntervalMs > 0 ? WIND_KMH_PER_HZ * 1000.0f / w.windMinIntervalMs : r.windAvgKmh;
+    r.windDirDeg = windDirectionDeg(windDirectionRawAdc());
 
     if (!bme280Ok) {
         beginBme280();  // retry a sensor that failed at boot
     }
+    r.bme280 = "error";
     if (bme280Ok) {
-        float tempC = bme280.readTempC();
-        float pressHpa = bme280.readFloatPressure() / 100.0f;
-        float rh = bme280.readFloatHumidity();
-        if (plausible(tempC, pressHpa * 100.0f, rh)) {
-            Serial.printf("temp_c=%.2f rh_pct=%.1f press_hpa=%.1f bme280=ok", tempC, rh, pressHpa);
-        } else {
-            Serial.print("bme280=implausible");
-        }
+        r.tempC = bme280.readTempC();
+        r.pressHpa = bme280.readFloatPressure() / 100.0f;
+        r.rhPct = bme280.readFloatHumidity();
+        r.bme280 = plausible(r.tempC, r.pressHpa * 100.0f, r.rhPct) ? "ok" : "implausible";
+    }
+
+    r.rssiValid = networkConnected();
+    r.rssiDbm = r.rssiValid ? networkRssi() : 0;
+    return r;
+}
+
+static void printReading(const Reading& r) {
+    Serial.printf(
+        "report id=%s time=%s t=%lu window_s=%lu rain_tips=%lu rain_mm=%.2f "
+        "rain_total=%lu ",
+        r.readingId, r.deviceTime[0] != '\0' ? r.deviceTime : "unsynced", (unsigned long)r.uptimeMs,
+        (unsigned long)r.windowS, (unsigned long)r.rainTips, r.rainMm,
+        (unsigned long)r.rainTipsTotal);
+    Serial.printf("wind_avg_kmh=%.1f wind_peak_kmh=%.1f ", r.windAvgKmh, r.windPeakKmh);
+    if (r.windDirDeg >= 0.0f) {
+        Serial.printf("wind_dir_deg=%.1f ", r.windDirDeg);
     } else {
-        Serial.print("bme280=error");
+        Serial.print("wind_dir_deg=unknown ");
+    }
+    if (strcmp(r.bme280, "ok") == 0) {
+        Serial.printf("temp_c=%.2f rh_pct=%.1f press_hpa=%.1f ", r.tempC, r.rhPct, r.pressHpa);
+    }
+    Serial.printf("bme280=%s", r.bme280);
+    if (r.rssiValid) {
+        Serial.printf(" rssi_dbm=%d", r.rssiDbm);
     }
     Serial.println();
+}
+
+// One attempt per reading; a failed reading is logged and dropped. Queuing
+// and retrying failed uploads is M4 work (bounded queue, ADR 0001).
+static void uploadReading(const Reading& r) {
+    char json[512];
+    if (!readingToJson(r, STATION_ID, json, sizeof(json))) {
+        Serial.printf("upload: id=%s FAILED payload too large\n", r.readingId);
+        uploadFailures++;
+        return;
+    }
+    int code = postReading(json);
+    if (code == 200 || code == 201) {
+        Serial.printf("upload: id=%s ok (%d)\n", r.readingId, code);
+        return;
+    }
+    uploadFailures++;
+    if (code == POST_NOT_CONNECTED) {
+        Serial.printf("upload: id=%s FAILED no wifi (failures=%lu)\n", r.readingId,
+                      (unsigned long)uploadFailures);
+    } else {
+        // Negative codes are HTTPClient errors (-1 refused, -11 read timeout).
+        Serial.printf("upload: id=%s FAILED code=%d (failures=%lu)\n", r.readingId, code,
+                      (unsigned long)uploadFailures);
+    }
+}
+
+static void report() {
+    Reading r = takeReading();
+    printReading(r);
+    uploadReading(r);
 }
 
 static void printHelp() {
@@ -91,7 +146,7 @@ static void handleSerial() {
         char c = (char)Serial.read();
         switch (c) {
             case 's':
-                printReport();
+                report();
                 break;
             case 'c':
                 calMode = !calMode;
@@ -122,11 +177,17 @@ void setup() {
     beginBme280();
     weatherMetersInit();
 
+    networkInit();
+    // After networkInit: with the radio on, esp_random() is a true RNG.
+    bootId = esp_random();
+    Serial.printf("boot id %08lx\n", (unsigned long)bootId);
+
     nextWindowAt = millis() + SAMPLE_WINDOW_MS;
 }
 
 void loop() {
     handleSerial();
+    networkPoll();
 
     uint32_t rainNow = rainTipsTotal();
     if (rainNow != lastRainSeen) {
@@ -163,6 +224,6 @@ void loop() {
     }
 
     if ((int32_t)(now - nextWindowAt) >= 0) {
-        printReport();
+        report();
     }
 }

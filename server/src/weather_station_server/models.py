@@ -5,7 +5,9 @@ from typing import Annotated, Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 Identifier = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
-WindKmh = Annotated[float, Field(ge=0, le=300)]
+# 500 km/h sits above the firmware ceiling (5 ms wind debounce = 480 km/h): a
+# glitchy gust must not cost the whole reading. Plausibility is M4 work.
+WindKmh = Annotated[float, Field(ge=0, le=500)]
 
 
 class Reading(BaseModel):

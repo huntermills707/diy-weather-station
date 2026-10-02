@@ -35,8 +35,8 @@ that has no valid number. The station sends `null` and never a fake value.
 | `window_s` | integer | 1-3600 | Length of the window that the rain and wind counts cover |
 | `rain_tips` | integer | ≥ 0 | Bucket tips in the window |
 | `rain_mm` | number | ≥ 0 | `rain_tips × RAIN_MM_PER_TIP` |
-| `wind_avg_kmh` | number | 0-300 | Average wind speed over the window |
-| `wind_peak_kmh` | number | 0-300 | Gust: the shortest gap between two closures |
+| `wind_avg_kmh` | number | 0-500 | Average wind speed over the window |
+| `wind_peak_kmh` | number | 0-500 | Gust: the shortest gap between two closures |
 | `wind_dir_deg` | number or null | 0 ≤ x < 360 | Vane heading. `null` = vane open or shorted |
 | `temp_c` | number or null | -40 to 85 | BME280 temperature |
 | `rh_pct` | number or null | 0-100 | BME280 relative humidity |
