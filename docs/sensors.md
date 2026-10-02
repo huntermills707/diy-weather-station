@@ -39,7 +39,7 @@ Invalid states print explicitly rather than as made-up numbers.
 | -------- | ------- | ------ |
 | `RAIN_MM_PER_TIP` | 0.2794 mm (0.011 in) | SEN-08942 datasheet / SparkFun library |
 | `WIND_KMH_PER_HZ` | 2.4 km/h per closure/s | SEN-08942 datasheet / SparkFun library |
-| `VANE_ADC[16]` | SparkFun ESP32 values (3118, 1526, 1761, …) | SparkFun library `SparkFun_Weather_Meter_Kit_Constants.h` |
+| `VANE_ADC[16]` | Calibrated on this unit 2026-10-02 (2867, 1381, 1599, …) | Field sweep; SparkFun ESP32 values (3118, 1526, 1761, …) in `SparkFun_Weather_Meter_Kit_Constants.h` are the fallback for new hardware |
 | `VANE_OFFSET_DEG` | 0 | — |
 
 Fixed sampling behaviour (in `weather_meters.cpp`, not expected to change):
@@ -60,9 +60,10 @@ This prints `cal vane_adc=<n> dir=<deg>` twice a second. Edit
 1. **Wind vane table.** Hold the vane pointing at each heading (N, NE, E, …)
    and write the `vane_adc` value into that heading's `VANE_ADC` slot. The
    eight main headings are easy to hold; the in-between ones (NNE, ENE, …)
-   sit in narrow spots — capture them if you can, otherwise leave the default.
-   This matters: SparkFun's defaults read ~8% high against this bench unit,
-   which mislabels 11 of 16 headings until the table is updated.
+   snap past without settling — capture them if you can, otherwise keep the
+   existing values (each must sit below both neighbouring main headings).
+   This matters: SparkFun's defaults read ~8% high against this unit, which
+   mislabelled 11 of 16 headings before calibration.
 2. **Vane orientation.** If the station's "N" mark can't face true north,
    set `VANE_OFFSET_DEG` to the direction the "N" mark actually faces
    (e.g. it faces east → `90`).

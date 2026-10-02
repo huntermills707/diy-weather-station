@@ -12,26 +12,31 @@ constexpr float RAIN_MM_PER_TIP = 0.2794f;
 constexpr float WIND_KMH_PER_HZ = 2.4f;
 
 // Wind vane: raw 12-bit ADC count for each heading, in heading order
-// 0, 22.5, 45, ... 337.5 degrees. Field procedure: stream raw counts with the
-// `c` serial command, point the vane at each heading, and write the count
-// here. The heading reported is the closest entry.
+// 0, 22.5, 45, ... 337.5 degrees. The heading reported is the closest entry.
+// Field procedure: stream raw counts with the `c` serial command, point the
+// vane at each heading, and write the count here.
+//
+// Calibrated on this unit 2026-10-02: the eight main headings were measured
+// in a sweep; the in-between headings won't hold still, so they are this
+// unit's earlier bench values (each sits below both neighbours, as the
+// resistor ladder requires). SparkFun's ESP32 defaults read ~8% high here.
 constexpr int VANE_ADC[16] = {
-    3118,  // 0.0   N
-    1526,  // 22.5  NNE
-    1761,  // 45.0  NE
-    199,   // 67.5  ENE
-    237,   // 90.0  E
-    123,   // 112.5 ESE
-    613,   // 135.0 SE
-    371,   // 157.5 SSE
-    1040,  // 180.0 S
-    859,   // 202.5 SSW
-    2451,  // 225.0 SW
-    2329,  // 247.5 WSW
-    3984,  // 270.0 W
-    3290,  // 292.5 WNW
-    3616,  // 315.0 NW
-    2755,  // 337.5 NNW
+    2867,  // 0.0   N
+    1381,  // 22.5  NNE
+    1599,  // 45.0  NE
+    150,   // 67.5  ENE
+    176,   // 90.0  E
+    74,    // 112.5 ESE
+    529,   // 135.0 SE
+    303,   // 157.5 SSE
+    915,   // 180.0 S
+    774,   // 202.5 SSW
+    2249,  // 225.0 SW
+    2154,  // 247.5 WSW
+    3794,  // 270.0 W
+    3181,  // 292.5 WNW
+    3393,  // 315.0 NW
+    2525,  // 337.5 NNW
 };
 
 // Added to the vane heading, for a station mounted with its "N" mark not
