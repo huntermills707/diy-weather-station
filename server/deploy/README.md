@@ -3,7 +3,8 @@
 The service runs under systemd as the unprivileged `weather-station` user and
 logs to journald ([ADR 0001](../../docs/adr/0001-local-architecture.md)).
 These steps assume a provisioned Raspberry Pi OS (Debian) host with SSH
-access, a fixed LAN address, and time sync. Run them as your normal admin
+access, a fixed LAN address, and time sync: see the
+[Raspberry Pi setup record](../../docs/raspberry-pi.md). Run them as your normal admin
 user.
 
 | What | Where | Owner |
