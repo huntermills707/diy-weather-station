@@ -49,7 +49,7 @@ int windDirectionRawAdc();
 float windDirectionDeg(int rawAdc);
 
 // Powers the soil probe, reads it, and powers it off again. Raw ADC 0..4095,
-// or -1 when no probe is attached.
+// or -1 when no probe is installed or it reads as unplugged.
 int soilMoistureRawAdc();
 
 // Raw soil reading mapped between SOIL_DRY_ADC and SOIL_WET_ADC, 0..100.

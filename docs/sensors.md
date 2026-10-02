@@ -25,7 +25,7 @@ uptime in ms; wall-clock time comes with NTP in M2. The serial capture script
 | `wind_avg_kmh` | km/h | Anemometer | Closures in the window ÷ window seconds × `WIND_KMH_PER_HZ` |
 | `wind_peak_kmh` | km/h | Anemometer | Shortest gap between two closures in the window; equals the average with fewer than two closures |
 | `wind_dir_deg` | degrees | Wind vane | Closest `VANE_ADC` entry + `VANE_OFFSET_DEG`; `unknown` when the vane is unplugged |
-| `soil_raw` / `soil_pct` | ADC / % | Soil probe | Probe powered for 10 ms, one read, then off; % is linear between `SOIL_DRY_ADC` and `SOIL_WET_ADC`; `soil=unknown` when no probe is attached |
+| `soil_raw` / `soil_pct` | ADC / % | Soil probe | Probe powered for 10 ms, one read, then off; % is linear between `SOIL_DRY_ADC` and `SOIL_WET_ADC`; `soil=unknown` unless `SOIL_PROBE_INSTALLED` is true and the probe reads as connected |
 | `temp_c` | °C | BME280 | Library read |
 | `rh_pct` | % RH | BME280 | Library read |
 | `press_hpa` | hPa | BME280 | Station pressure (not sea-level corrected) |
@@ -41,6 +41,7 @@ Invalid states print explicitly rather than as made-up numbers.
 | `WIND_KMH_PER_HZ` | 2.4 km/h per closure/s | SEN-08942 datasheet / SparkFun library |
 | `VANE_ADC[16]` | SparkFun ESP32 values (3118, 1526, 1761, …) | SparkFun library `SparkFun_Weather_Meter_Kit_Constants.h` |
 | `VANE_OFFSET_DEG` | 0 | — |
+| `SOIL_PROBE_INSTALLED` | false | No probe on the bench unit |
 | `SOIL_DRY_ADC` / `SOIL_WET_ADC` | 0 / 4095 | Placeholder until measured |
 
 Fixed sampling behaviour (in `weather_meters.cpp`, not expected to change):
@@ -67,7 +68,7 @@ This prints `cal vane_adc=<n> dir=<deg> soil_raw=<n>` twice a second. Edit
 2. **Vane orientation.** If the station's "N" mark can't face true north,
    set `VANE_OFFSET_DEG` to the direction the "N" mark actually faces
    (e.g. it faces east → `90`).
-3. **Soil probe.** Note `soil_raw` with the probe in dry soil (or air) and
+3. **Soil probe.** Set `SOIL_PROBE_INSTALLED = true` and upload, then note `soil_raw` with the probe in dry soil (or air) and
    in a glass of water; put them in `SOIL_DRY_ADC` / `SOIL_WET_ADC`.
 4. **Rain and wind** need no calibration. To sanity-check: pour a known
    volume slowly through the gauge, or compare wind against a handheld
@@ -81,6 +82,9 @@ This prints `cal vane_adc=<n> dir=<deg> soil_raw=<n>` twice a second. Edit
   on every new capture.
 - The soil probe corrodes if left powered; firmware powers it only for the
   10 ms read.
+- With no probe, the soil input floats: it usually reads ~1100-1300 but
+  dipped to 0-114 on the bench when the board was handled, which is why
+  soil is off unless `SOIL_PROBE_INSTALLED` is set.
 - Soil moisture is unverified on hardware: no probe was attached during bench
   bring-up. Pins follow the ESP32 MicroMod board definition (SIG = A0/GPIO 34,
   power = G0/GPIO 15); SparkFun's soil example uses GPIO 4 for G0, but their

@@ -8,7 +8,7 @@ constexpr int VANE_OPEN_CIRCUIT_ADC = 4090;
 constexpr uint32_t SOIL_SETTLE_MS = 10;
 
 // With its power off, a connected probe pulls SIG near 0. A higher reading
-// means nothing is attached and the input is floating.
+// means the probe has come unplugged and the input is floating.
 constexpr int SOIL_UNPOWERED_MAX_ADC = 200;
 
 static volatile uint32_t rainTotal = 0;
@@ -127,7 +127,7 @@ float windDirectionDeg(int rawAdc) {
 }
 
 int soilMoistureRawAdc() {
-    if (analogRead(PIN_SOIL) > SOIL_UNPOWERED_MAX_ADC) {
+    if (!SOIL_PROBE_INSTALLED || analogRead(PIN_SOIL) > SOIL_UNPOWERED_MAX_ADC) {
         return -1;
     }
     digitalWrite(PIN_SOIL_PWR, HIGH);

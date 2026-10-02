@@ -18,6 +18,8 @@ from datetime import UTC, datetime
 
 import serial
 
+BOOT_WAIT_S = 2.5
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -38,6 +40,9 @@ def main() -> int:
     port.open()
 
     if args.send:
+        # Opening the port rebooted the board; bytes sent before setup()
+        # finishes are lost, so wait for boot before sending.
+        time.sleep(BOOT_WAIT_S)
         port.write(args.send.encode())
 
     out = open(args.out, "a") if args.out else None
