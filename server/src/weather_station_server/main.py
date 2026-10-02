@@ -1,6 +1,19 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
-app = FastAPI(title="weather-station-server")
+from weather_station_server.config import load_ingest_token
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Fail fast at startup when required secrets are missing (issue #23).
+    app.state.ingest_token = load_ingest_token()
+    yield
+
+
+app = FastAPI(title="weather-station-server", lifespan=lifespan)
 
 
 @app.get("/health")

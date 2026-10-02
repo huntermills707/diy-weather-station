@@ -8,12 +8,9 @@ on:
       - platformio.ini
       - .clang-format
       - .github/workflows/firmware.yml
+  # No path filter on PRs: these jobs are required status checks on main, so
+  # they must run on every pull request regardless of what it touches.
   pull_request:
-    paths:
-      - firmware/**
-      - platformio.ini
-      - .clang-format
-      - .github/workflows/firmware.yml
 
 permissions:
   contents: read
@@ -38,6 +35,9 @@ jobs:
 
       - name: Install PlatformIO
         run: pip install platformio
+
+      - name: Create local secrets header from template
+        run: cp firmware/secrets.example.h firmware/secrets.h
 
       - name: Compile firmware
         run: pio run

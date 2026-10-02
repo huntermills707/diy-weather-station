@@ -19,6 +19,21 @@ folder — both build systems pick them up automatically. The `platformio.ini`
 at the repository root points `src_dir` here, so both IDEs build the same
 files.
 
+## Secrets (required to build)
+
+WiFi credentials and the ingest token live in `firmware/secrets.h`, which is
+gitignored and must never be committed (issue #23). The sketch fails to
+compile without it:
+
+```sh
+cp firmware/secrets.example.h firmware/secrets.h
+# then edit firmware/secrets.h with real values
+```
+
+`INGEST_TOKEN` must match `WEATHER_STATION_INGEST_TOKEN` on the server
+(see `server/README.md`). CI builds with the placeholder values from
+`secrets.example.h`.
+
 ## Setup: CLion + PlatformIO
 
 1. Install the PlatformIO plugin in CLion (or use the `pio` CLI).
@@ -89,8 +104,8 @@ moisture terminal (A0/G0) is not used.
 
 ## CI and static analysis
 
-The `Firmware` GitHub Actions workflow runs on pushes to `main` and on pull
-requests that touch `firmware/` or `platformio.ini`:
+The `Firmware` GitHub Actions workflow runs on every pull request and on
+pushes to `main` that touch `firmware/` or `platformio.ini`:
 
 - **Compile**: `pio run` — compilation errors fail the workflow
 - **Static analysis**: `pio check --fail-on-defect medium` (cppcheck, medium+ severity)
