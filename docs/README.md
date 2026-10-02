@@ -6,5 +6,6 @@ Project documentation.
   [ADR 0001: local architecture](adr/0001-local-architecture.md)
 - [Ingest API](ingest-api.md) — how the station submits readings
 - [Database](database.md) — SQLite schema, timestamps, and retention
+- [Raspberry Pi setup record](raspberry-pi.md) — how the server Pi is built
 - [Sensors, units, and calibration](sensors.md) — report fields and the
   one-time field calibration procedure
