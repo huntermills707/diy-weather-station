@@ -43,5 +43,5 @@ WindRainWindow windRainTakeWindow();
 int windDirectionRawAdc();
 
 // Heading in degrees (closest VANE_ADC entry plus VANE_OFFSET_DEG), or -1.0f
-// when the vane reads open circuit (unplugged).
+// when the vane reads open circuit (unplugged) or shorted to ground.
 float windDirectionDeg(int rawAdc);

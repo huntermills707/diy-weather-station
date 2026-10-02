@@ -25,7 +25,7 @@ uptime in ms; wall-clock time comes with NTP in M2. The serial capture script
 | `rain_total` | count | Rain gauge | Tips since boot (resets on reboot) |
 | `wind_avg_kmh` | km/h | Anemometer | Closures in the window ÷ window seconds × `WIND_KMH_PER_HZ` |
 | `wind_peak_kmh` | km/h | Anemometer | Shortest gap between two closures in the window; equals the average with fewer than two closures |
-| `wind_dir_deg` | degrees | Wind vane | Closest `VANE_ADC` entry + `VANE_OFFSET_DEG`; `unknown` when the vane is unplugged |
+| `wind_dir_deg` | degrees | Wind vane | Closest `VANE_ADC` entry + `VANE_OFFSET_DEG`; `unknown` when the vane reads open circuit (unplugged) or shorted to ground |
 | `temp_c` | °C | BME280 | Library read |
 | `rh_pct` | % RH | BME280 | Library read |
 | `press_hpa` | hPa | BME280 | Station pressure (not sea-level corrected) |

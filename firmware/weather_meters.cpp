@@ -1,8 +1,11 @@
 #include "weather_meters.h"
 
 // A vane reading this close to full scale means the ladder is open circuit
-// (vane unplugged): only the 10k pull-up is left.
+// (vane unplugged): only the 10k pull-up is left. One this close to zero
+// means the line is shorted to ground; the lowest real heading (ESE) reads
+// ~74 on this unit and 123 with SparkFun's defaults.
 constexpr int VANE_OPEN_CIRCUIT_ADC = 4090;
+constexpr int VANE_SHORT_CIRCUIT_ADC = 30;
 
 static volatile uint32_t rainTotal = 0;
 static volatile uint32_t rainLastEdgeMs = 0;
@@ -102,7 +105,7 @@ int windDirectionRawAdc() {
 }
 
 float windDirectionDeg(int rawAdc) {
-    if (rawAdc >= VANE_OPEN_CIRCUIT_ADC) {
+    if (rawAdc >= VANE_OPEN_CIRCUIT_ADC || rawAdc <= VANE_SHORT_CIRCUIT_ADC) {
         return -1.0f;
     }
     // Closest calibrated value wins, like SparkFun's Weather Meter Kit library.

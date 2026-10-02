@@ -78,7 +78,9 @@ moisture terminal (A0/G0) is not used: soil moisture is out of scope.
 
 Report fields, units, defaults, and the one-time field calibration procedure
 are in [docs/sensors.md](../docs/sensors.md). Every tunable value lives in
-`calibration.h`, defaulting to SparkFun's published Weather Meter Kit values.
+`calibration.h`. Rain and wind use SparkFun's published Weather Meter Kit
+values; the `VANE_ADC` table is field-calibrated for this unit, with SparkFun's
+table as the fallback for new hardware.
 
 ## Serial output and commands (115200 baud)
 
