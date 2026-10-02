@@ -15,11 +15,11 @@
 // Collection cadence per ADR 0001: one reading every five minutes.
 constexpr uint32_t SAMPLE_WINDOW_MS = 5UL * 60UL * 1000UL;
 constexpr uint32_t LIVE_WIND_PRINT_MS = 1000;
-constexpr uint32_t VANE_CAL_PRINT_MS = 500;
+constexpr uint32_t CAL_PRINT_MS = 500;
 
 BME280 bme280;
 bool bme280Ok = false;
-bool vaneCalMode = false;
+bool calMode = false;
 
 uint32_t nextWindowAt = 0;
 uint32_t nextWindPrintAt = 0;
@@ -51,7 +51,8 @@ static void printReport() {
     float windPeakKmh =
         w.windMinIntervalMs > 0 ? WIND_KMH_PER_HZ * 1000.0f / w.windMinIntervalMs : windAvgKmh;
 
-    float windDir = windDirectionDeg();
+    float windDir = windDirectionDeg(windDirectionRawAdc());
+    int soilRaw = soilMoistureRawAdc();
 
     Serial.printf("report t=%lu window_s=%lu rain_tips=%lu rain_mm=%.2f rain_total=%lu ",
                   (unsigned long)millis(), (unsigned long)(w.durationMs / 1000),
@@ -62,6 +63,11 @@ static void printReport() {
         Serial.printf("wind_dir_deg=%.1f ", windDir);
     } else {
         Serial.print("wind_dir_deg=unknown ");
+    }
+    if (soilRaw >= 0) {
+        Serial.printf("soil_raw=%d soil_pct=%.0f ", soilRaw, soilMoisturePct(soilRaw));
+    } else {
+        Serial.print("soil=unknown ");
     }
 
     if (!bme280Ok) {
@@ -83,7 +89,7 @@ static void printReport() {
 }
 
 static void printHelp() {
-    Serial.println("commands: s=sample report now, c=toggle vane calibration, h=help");
+    Serial.println("commands: s=sample report now, c=toggle calibration stream, h=help");
 }
 
 static void handleSerial() {
@@ -94,14 +100,14 @@ static void handleSerial() {
                 printReport();
                 break;
             case 'c':
-                vaneCalMode = !vaneCalMode;
-                if (vaneCalMode) {
+                calMode = !calMode;
+                if (calMode) {
                     // Refresh the schedule so the stream starts promptly even
                     // after long uptime (stale 0 goes negative past 24.8 days
                     // under the wrap-safe comparison).
                     nextCalPrintAt = millis();
                 }
-                Serial.println(vaneCalMode ? "vane calibration on" : "vane calibration off");
+                Serial.println(calMode ? "calibration stream on" : "calibration stream off");
                 break;
             case 'h':
                 printHelp();
@@ -151,14 +157,15 @@ void loop() {
         }
     }
 
-    if (vaneCalMode && (int32_t)(now - nextCalPrintAt) >= 0) {
-        nextCalPrintAt = now + VANE_CAL_PRINT_MS;
-        int adc = windDirectionRawAdc();
-        float deg = windDirectionDeg();
+    if (calMode && (int32_t)(now - nextCalPrintAt) >= 0) {
+        nextCalPrintAt = now + CAL_PRINT_MS;
+        int vaneAdc = windDirectionRawAdc();
+        float deg = windDirectionDeg(vaneAdc);
+        int soilRaw = soilMoistureRawAdc();
         if (deg >= 0.0f) {
-            Serial.printf("vane adc=%d dir=%.1f\n", adc, deg);
+            Serial.printf("cal vane_adc=%d dir=%.1f soil_raw=%d\n", vaneAdc, deg, soilRaw);
         } else {
-            Serial.printf("vane adc=%d dir=unknown\n", adc);
+            Serial.printf("cal vane_adc=%d dir=unknown soil_raw=%d\n", vaneAdc, soilRaw);
         }
     }
 
