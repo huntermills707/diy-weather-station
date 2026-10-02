@@ -9,6 +9,10 @@ Responsibilities:
 - Expose defined errors and a health endpoint
 - Run under systemd as a non-root user with journald logging
 
+The API is documented in [docs/ingest-api.md](../docs/ingest-api.md) and the
+SQLite schema in [docs/database.md](../docs/database.md). Interactive API docs
+are served at `/docs` while the service runs.
+
 Tooling: `uv` for environment/dependencies, `ruff` for lint, `pytest` for tests.
 
 ## Setup
@@ -35,6 +39,11 @@ service refuses to start without them:
 - `WEATHER_STATION_INGEST_TOKEN` — per-station pre-shared token that
   stations send as `Authorization: Bearer` (ADR 0001). Must match
   `INGEST_TOKEN` in the station's `firmware/secrets.h`.
+
+Optional:
+
+- `WEATHER_STATION_DB_PATH` — SQLite file for readings; defaults to
+  `weather.db` in the working directory. Created on startup if missing.
 
 For local development, copy `.env.example` to `.env` (gitignored), fill in a
 token, and load it before starting the service:
