@@ -9,6 +9,8 @@ import os
 from collections.abc import Mapping
 
 INGEST_TOKEN_ENV_VAR = "WEATHER_STATION_INGEST_TOKEN"
+DB_PATH_ENV_VAR = "WEATHER_STATION_DB_PATH"
+DEFAULT_DB_PATH = "weather.db"
 
 
 class MissingConfigError(RuntimeError):
@@ -26,3 +28,9 @@ def load_ingest_token(env: Mapping[str, str] | None = None) -> str:
             "(or set the variable directly, or via the systemd EnvironmentFile)."
         )
     return token
+
+
+def load_db_path(env: Mapping[str, str] | None = None) -> str:
+    """Return the SQLite file path, defaulting to ``weather.db`` in the cwd."""
+    env = os.environ if env is None else env
+    return env.get(DB_PATH_ENV_VAR, "").strip() or DEFAULT_DB_PATH

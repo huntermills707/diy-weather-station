@@ -12,3 +12,6 @@
 
 // Ingest endpoint on the LAN, e.g. "http://192.168.1.50:8000/readings".
 #define INGEST_URL "http://your-server-ip:8000/readings"
+
+// Optional: NTP server for the station clock (default "pool.ntp.org").
+// #define NTP_SERVER "192.168.1.50"

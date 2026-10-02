@@ -14,12 +14,17 @@ dropped from the project; neither is read.
 
 ## Report fields
 
-One `report` line every five minutes (or on demand with `s`). `t` is device
-uptime in ms; wall-clock time comes with NTP in M2. The serial capture script
-(`scripts/serial_capture.py`) prefixes every line with host UTC time.
+One `report` line every five minutes (or on demand with `s`). The same
+reading is POSTed to the ingest service ([ingest-api.md](ingest-api.md)) with
+the same field names, except that `id`, `time`, and `t` become `reading_id`,
+`device_time`, and `uptime_ms`, and `rain_total` is serial-only. The serial capture
+script (`scripts/serial_capture.py`) prefixes every line with host UTC time.
 
 | Field | Unit | Sensor | How it is measured |
 | ----- | ---- | ------ | ------------------ |
+| `id` | — | — | `reading_id`: `<boot_id>-<seq>`, random per boot, counting per reading |
+| `time` | UTC | — | `device_time` from NTP; `unsynced` until the first NTP sync after boot |
+| `t` | ms | — | Device uptime (`uptime_ms`) |
 | `window_s` | s | — | Length of the window the rain/wind counts cover |
 | `rain_tips` / `rain_mm` | count / mm | Rain gauge | Tips in the window × `RAIN_MM_PER_TIP` |
 | `rain_total` | count | Rain gauge | Tips since boot (resets on reboot) |
@@ -30,6 +35,7 @@ uptime in ms; wall-clock time comes with NTP in M2. The serial capture script
 | `rh_pct` | % RH | BME280 | Library read |
 | `press_hpa` | hPa | BME280 | Station pressure (not sea-level corrected) |
 | `bme280` | — | BME280 | `ok`, `implausible` (out-of-range values suppressed), or `error` (no I2C response; retried each report) |
+| `rssi_dbm` | dBm | WiFi | Signal strength; omitted while WiFi is down |
 
 Invalid states print explicitly rather than as made-up numbers.
 
@@ -76,4 +82,4 @@ This prints `cal vane_adc=<n> dir=<deg>` twice a second. Edit
 - The vane's 67.5° and 90° values are close (~40 ADC counts), so readings
   near those headings can flip in noise.
 - Opening the serial port resets the board, so `rain_total` restarts from 0
-  on every new capture.
+  on every new capture, and the reading `id` gets a new boot ID.

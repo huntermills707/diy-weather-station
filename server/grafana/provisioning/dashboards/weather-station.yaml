@@ -1,0 +1,10 @@
+# Loads dashboards straight from the git checkout, so `git pull` updates them.
+apiVersion: 1
+providers:
+  - name: weather-station
+    folder: Weather station
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /opt/weather-station/server/grafana/dashboards

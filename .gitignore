@@ -223,3 +223,7 @@ __marimo__/
 # Local secrets (issue #23) — never commit real credentials
 /firmware/secrets.h
 server/.env
+
+# Local reading databases (docs/database.md)
+*.db
+*.db-journal

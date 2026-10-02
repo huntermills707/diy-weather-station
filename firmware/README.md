@@ -7,8 +7,15 @@ Responsibilities:
 
 - Read sensors (BME280, rain gauge, anemometer, wind vane)
 - Connect to WiFi with bounded retry/backoff
+- Timestamp readings in UTC via NTP
 - POST readings to the FastAPI ingest service over the LAN every five minutes
-- Queue failed uploads to a bounded backlog and retry oldest-first
+  ([docs/ingest-api.md](../docs/ingest-api.md))
+- Queue failed uploads to a bounded backlog and retry oldest-first (M4; for
+  now a failed upload is logged and that reading is dropped)
+
+`firmware.ino` takes and reports readings, `weather_meters.*` reads the
+rain/wind/vane hardware, `network.*` handles WiFi, NTP and the HTTP POST, and
+`reading.*` builds the JSON payload.
 
 ## Layout
 
@@ -31,7 +38,9 @@ cp firmware/secrets.example.h firmware/secrets.h
 ```
 
 `INGEST_TOKEN` must match `WEATHER_STATION_INGEST_TOKEN` on the server
-(see `server/README.md`). CI builds with the placeholder values from
+(see `server/README.md`). `INGEST_URL` points at the Pi, e.g.
+`http://192.168.1.50:8000/readings`. Optionally define `NTP_SERVER` (default
+`pool.ntp.org`). `STATION_ID` at the top of `firmware.ino` names the station. CI builds with the placeholder values from
 `secrets.example.h`.
 
 ## Setup: CLion + PlatformIO
@@ -84,10 +93,18 @@ table as the fallback for new hardware.
 
 ## Serial output and commands (115200 baud)
 
-- `report ...` every five minutes (ADR 0001 cadence): rain, wind, vane
-  direction, and BME280 fields (see docs/sensors.md). Invalid sensor states
-  print explicitly (`bme280=error`, `wind_dir_deg=unknown`) instead of
-  fabricated values.
+- `report ...` every five minutes (ADR 0001 cadence): reading ID, UTC time,
+  rain, wind, vane direction, BME280 fields, and RSSI (see docs/sensors.md).
+  Invalid sensor states print explicitly (`bme280=error`,
+  `wind_dir_deg=unknown`, `time=unsynced`) instead of fabricated values.
+- `upload: id=... ok (201)` after each report, or `FAILED no wifi` /
+  `FAILED code=N` with a running failure count. `200` means the server already
+  had that reading. Negative codes are HTTPClient errors (`-1` connection
+  refused, `-11` read timeout).
+- `wifi: ...` on every connect attempt, connection (with IP and RSSI), and
+  link loss. Retries back off 10 s, 20 s, 40 s … up to 5 minutes; sensors and
+  reports keep running throughout. `ntp: started` follows the first
+  connection.
 - `event: rain tip #N` prints immediately on each debounced tip; wind closures
   print once per second while the anemometer is turning.
 - Commands: `s` = print a sample report now (resets the window),

@@ -1,0 +1,41 @@
+# Weather station ingest service (ADR 0001). Install steps: deploy/README.md.
+[Unit]
+Description=Weather station ingest service
+Documentation=https://github.com/huntermills707/diy-weather-station/blob/main/server/deploy/README.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=exec
+User=weather-station
+Group=weather-station
+WorkingDirectory=/opt/weather-station/server
+# Secrets (WEATHER_STATION_INGEST_TOKEN) live in a root-only file that systemd
+# reads before dropping privileges; values there override the line below.
+EnvironmentFile=/etc/weather-station/env
+Environment=WEATHER_STATION_DB_PATH=/var/lib/weather-station/weather.db
+ExecStart=/opt/weather-station/server/.venv/bin/uvicorn weather_station_server.main:app \
+    --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+# /var/lib/weather-station, created and owned by the service user.
+StateDirectory=weather-station
+StateDirectoryMode=0750
+UMask=0027
+
+# Hardening: the service only needs its state directory and the network.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+RestrictRealtime=yes
+
+[Install]
+WantedBy=multi-user.target
