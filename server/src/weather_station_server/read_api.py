@@ -68,6 +68,7 @@ class Derived(BaseModel):
 
 class RainTotals(BaseModel):
     last_hour_mm: float
+    last_24h_mm: float
     today_mm: float
     month_mm: float
 

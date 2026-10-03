@@ -25,7 +25,7 @@ One page, top to bottom:
    - **Pressure**: sea level when the altitude is set, with station
      pressure underneath. Otherwise station pressure, labelled
      "altitude not set".
-   - **Rain today**, with the last hour and this month.
+   - **Rain today**, with the last hour, the last 24 hours, and this month.
    - **Wind**: the average, gust, and direction as a compass needle and a
      label ("from WNW (293°)"). The needle points into the wind, like the
      vane.
@@ -44,6 +44,16 @@ One page, top to bottom:
 On a phone the cards sit two per row (wind full width) and the charts stack
 in one column. On a wide screen the cards fit one row and the charts two
 columns.
+
+## Units
+
+A switch in the header picks **°F · mph** or **°C · km/h** for temperature
+(including dew point and heat index) and wind speed, everywhere on the page.
+It defaults to °F · mph in a US English browser and °C · km/h elsewhere, and
+the browser remembers the choice. Rain stays in mm and pressure in hPa. The
+API is always metric; the dashboard converts for display, and wind rose
+speed classes are rounded to whole mph (2, 10, 20, 30 km/h become 1, 6, 12,
+19 mph).
 
 ## Timestamps
 

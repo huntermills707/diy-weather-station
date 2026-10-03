@@ -34,6 +34,10 @@ CREATE TABLE IF NOT EXISTS readings (
     UNIQUE (station_id, reading_id)
 );
 CREATE INDEX IF NOT EXISTS readings_station_time ON readings (station_id, received_at);
+-- Reading time (docs/database.md): the read API's range queries search this
+-- index instead of scanning every row.
+CREATE INDEX IF NOT EXISTS readings_station_reading_time
+    ON readings (station_id, COALESCE(device_time, received_at));
 """
 
 # Payload fields stored as-is, in column order (device_time is converted).

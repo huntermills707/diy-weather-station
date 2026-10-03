@@ -258,6 +258,10 @@ h3 {
   background: var(--surface);
 }
 
+.units {
+  margin-left: auto;
+}
+
 .segmented button {
   min-height: 44px;
   min-width: 72px;

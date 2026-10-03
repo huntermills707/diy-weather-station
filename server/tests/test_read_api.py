@@ -45,7 +45,7 @@ def test_current_with_no_readings(client: TestClient) -> None:
     assert body["reading"] is None
     assert body["derived"] is None
     assert body["health"] is None
-    assert body["rain"] == {"last_hour_mm": 0, "today_mm": 0, "month_mm": 0}
+    assert body["rain"] == {"last_hour_mm": 0, "last_24h_mm": 0, "today_mm": 0, "month_mm": 0}
 
 
 def test_current_returns_latest_reading_with_derived_metrics(
@@ -160,6 +160,8 @@ def test_rain_totals_follow_local_day_and_month(db_path: Path) -> None:
 
     assert totals == {
         "last_hour_mm": 128.0,
+        # Since 17:00 UTC on 2 October.
+        "last_24h_mm": 8.0 + 16.0 + 32.0 + 64.0 + 128.0,
         "today_mm": 32.0 + 64.0 + 128.0,
         "month_mm": 4.0 + 8.0 + 16.0 + 32.0 + 64.0 + 128.0,
     }
@@ -413,6 +415,17 @@ def test_sector_of(direction: float, label: str) -> None:
 
 
 # --- Database errors and the dashboard ---------------------------------------
+
+
+def test_range_queries_use_the_reading_time_index(client: TestClient, db_path: Path) -> None:
+    """Rain totals and series search the index instead of scanning every row."""
+    with sqlite3.connect(db_path) as conn:
+        plan = conn.execute(
+            f"EXPLAIN QUERY PLAN SELECT sum(rain_mm) FROM (SELECT {history.READING_TIME} AS time, "
+            "rain_mm FROM readings WHERE station_id = ?) WHERE time > ?",
+            ("station-1", "2026-10-01"),
+        ).fetchall()
+    assert "USING INDEX readings_station_reading_time" in str(plan)
 
 
 def test_read_api_reports_unreadable_database(client: TestClient, db_path: Path) -> None:

@@ -72,7 +72,7 @@ The latest reading, with derived metrics, rain totals, and station health.
     "sea_level_hpa": 1010.8,
     "altitude_m": 50.0
   },
-  "rain": { "last_hour_mm": 0.0, "today_mm": 0.0, "month_mm": 1.68 },
+  "rain": { "last_hour_mm": 0.0, "last_24h_mm": 0.0, "today_mm": 0.0, "month_mm": 1.68 },
   "health": {
     "age_s": 1483.7,
     "stale": true,
@@ -109,6 +109,7 @@ The latest reading, with derived metrics, rain totals, and station health.
 | Total | Period |
 | ----- | ------ |
 | `last_hour_mm` | Readings in the last 60 minutes |
+| `last_24h_mm` | Readings in the last 24 hours |
 | `today_mm` | Readings since local midnight |
 | `month_mm` | Readings since local midnight on the 1st |
 

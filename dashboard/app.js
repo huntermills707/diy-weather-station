@@ -11,9 +11,34 @@ const HISTORY_EVERY_MS = 5 * 60e3;
 const HEAT_INDEX_FROM_C = 26.7;
 // Same calm limit as the server's wind rose (docs/read-api.md).
 const CALM_KMH = 2;
+// The API is metric; the dashboard converts temperature and wind speed for
+// display. Rain stays in mm and pressure in hPa.
+const UNIT_SYSTEMS = {
+  us: {
+    temp: { unit: "°F", convert: (c) => (c * 9) / 5 + 32 },
+    speed: { unit: "mph", convert: (kmh) => kmh / 1.609344 },
+  },
+  metric: {
+    temp: { unit: "°C", convert: (c) => c },
+    speed: { unit: "km/h", convert: (kmh) => kmh },
+  },
+};
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-const state = { range: RANGES[PARAMS.get("range")] ? PARAMS.get("range") : "24h", current: null, series: null, rose: null, historyRequest: 0 };
+function savedUnits() {
+  try {
+    const saved = localStorage.getItem("units");
+    if (UNIT_SYSTEMS[saved]) return saved;
+  } catch {
+    // Storage blocked: fall back to the browser's locale.
+  }
+  return navigator.language === "en-US" ? "us" : "metric";
+}
+
+const state = {
+  units: savedUnits(),
+  range: RANGES[PARAMS.get("range")] ? PARAMS.get("range") : "24h",
+  current: null, series: null, rose: null, historyRequest: 0 };
 
 // ---- Formatting ------------------------------------------------------------
 
@@ -35,6 +60,15 @@ const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 function fixed(value, digits) {
   return value == null ? "—" : value.toFixed(digits);
+}
+
+// Convert a metric value of a quantity ("temp" or "speed") to the chosen units.
+function convert(quantity, value) {
+  return value == null ? null : UNIT_SYSTEMS[state.units][quantity].convert(value);
+}
+
+function unitOf(quantity) {
+  return UNIT_SYSTEMS[state.units][quantity].unit;
 }
 
 function duration(seconds) {
@@ -184,15 +218,16 @@ function renderConditions(data) {
     error: "Sensor not responding",
   }[r.bme280];
 
-  setValue("temp", r.temp_c, 1, "°C");
+  const tempUnit = unitOf("temp");
+  setValue("temp", convert("temp", r.temp_c), 1, tempUnit);
   if (sensorReason) {
     setText("temp-detail", sensorReason);
   } else {
     const parts = [];
     if (r.temp_c >= HEAT_INDEX_FROM_C && d.heat_index_c != null) {
-      parts.push(`Heat index ${fixed(d.heat_index_c, 1)} °C`);
+      parts.push(`Heat index ${fixed(convert("temp", d.heat_index_c), 1)} ${tempUnit}`);
     }
-    parts.push(`Dew point ${fixed(d.dew_point_c, 1)} °C`);
+    parts.push(`Dew point ${fixed(convert("temp", d.dew_point_c), 1)} ${tempUnit}`);
     setText("temp-detail", parts.join(" · "));
   }
 
@@ -211,9 +246,10 @@ function renderConditions(data) {
     );
   }
 
-  setValue("wind", r.wind_avg_kmh, 1, "km/h");
+  const speedUnit = unitOf("speed");
+  setValue("wind", convert("speed", r.wind_avg_kmh), 1, speedUnit);
   const arrow = field("wind-arrow");
-  const parts = [`Gust ${fixed(r.wind_peak_kmh, 1)} km/h`];
+  const parts = [`Gust ${fixed(convert("speed", r.wind_peak_kmh), 1)} ${speedUnit}`];
   if (r.wind_avg_kmh < CALM_KMH) {
     // In still air the vane just keeps its last position.
     parts.push("calm");
@@ -235,7 +271,14 @@ function renderConditions(data) {
 function setRain(data) {
   const rain = data.rain;
   setValue("rain", rain.today_mm, 1, "mm");
-  let detail = `Last hour ${fixed(rain.last_hour_mm, 1)} mm · this month ${fixed(rain.month_mm, 1)} mm`;
+  // Non-breaking spaces keep each total on one line when the text wraps.
+  let detail = [
+    ["Last hour", rain.last_hour_mm],
+    ["24 h", rain.last_24h_mm],
+    ["this month", rain.month_mm],
+  ]
+    .map(([label, mm]) => `${label}\u00a0${fixed(mm, 1)}\u00a0mm`)
+    .join(" · ");
   if (data.timezone !== browserZone) detail += ` (days in ${data.timezone})`;
   setText("rain-detail", detail);
 }
@@ -298,7 +341,7 @@ const CHARTS = {
   temp: {
     lines: [{ key: "temp_c", color: "var(--temp)", label: "Average" }],
     band: { min: "temp_min_c", max: "temp_max_c", color: "var(--band)", label: "Min–max" },
-    unit: "°C",
+    quantity: "temp",
     digits: 1,
   },
   humidity: {
@@ -316,7 +359,7 @@ const CHARTS = {
       { key: "wind_avg_kmh", color: "var(--wind)", label: "Average" },
       { key: "wind_peak_kmh", color: "var(--gust)", label: "Gust" },
     ],
-    unit: "km/h",
+    quantity: "speed",
     digits: 1,
     fromZero: true,
     legend: true,
@@ -338,7 +381,12 @@ function renderHistory() {
       ? "Each point is one five-minute reading. Breaks in a line are missing readings."
       : `Each point averages ${minutes >= 60 ? `${minutes / 60} h` : `${minutes} min`} of readings ` +
         "(highest gust, total rain). Breaks in a line are periods without readings.";
-  const points = series.points.map((p) => ({ ...p, t: Date.parse(p.time) }));
+  const points = series.points.map((p) => {
+    const point = { ...p, t: Date.parse(p.time) };
+    for (const key of ["temp_c", "temp_min_c", "temp_max_c"]) point[key] = convert("temp", p[key]);
+    for (const key of ["wind_avg_kmh", "wind_peak_kmh"]) point[key] = convert("speed", p[key]);
+    return point;
+  });
   const start = Date.parse(series.start);
   const end = Date.parse(series.end);
   for (const [name, spec] of Object.entries(CHARTS)) {
@@ -528,7 +576,8 @@ function attachTooltip(plot, svg, cursor, spec, points, x, bucketS) {
     cursor.setAttribute("visibility", "visible");
     const when = new Date(best.t);
     const lines = [bucketS > 300 ? `${fmtDateTime.format(when)} (avg of ${best.n})` : fmtDateTime.format(when)];
-    for (const item of items) lines.push(`${item.label}: ${fixed(best[item.key], spec.digits)} ${spec.unit}`);
+    const unit = spec.quantity ? unitOf(spec.quantity) : spec.unit;
+    for (const item of items) lines.push(`${item.label}: ${fixed(best[item.key], spec.digits)} ${unit}`);
     tooltip.textContent = lines.join("\n");
     tooltip.hidden = false;
     const left = Math.min(event.clientX + 12, window.innerWidth - tooltip.offsetWidth - 8);
@@ -570,7 +619,8 @@ function drawRose(plot, rose) {
   const detail = document.getElementById("rose-detail");
   const pct = (n) => (rose.total ? `${Math.round((100 * n) / rose.total)}%` : "0%");
   detail.textContent =
-    `${rose.total} readings · calm (below ${rose.calm_below_kmh} km/h) ${rose.calm} (${pct(rose.calm)})` +
+    `${rose.total} readings · calm (below ${speedText(rose.calm_below_kmh)}) ${rose.calm} ` +
+    `(${pct(rose.calm)})` +
     ` · direction unknown ${rose.unknown} (${pct(rose.unknown)})`;
 
   const totals = rose.sectors.map((s) => s.counts.reduce((a, b) => a + b, 0));
@@ -636,7 +686,31 @@ function drawRose(plot, rose) {
 
 function speedLabel(rose, cls) {
   const edges = rose.speed_classes_kmh;
-  return cls + 1 < edges.length ? `${edges[cls]}–${edges[cls + 1]} km/h` : `${edges[cls]}+ km/h`;
+  const low = speedText(edges[cls], false);
+  return cls + 1 < edges.length ? `${low}–${speedText(edges[cls + 1])}` : `${low}+ ${unitOf("speed")}`;
+}
+
+// A km/h speed class edge in the chosen units, rounded to a whole number.
+function speedText(kmh, withUnit = true) {
+  const value = Math.round(convert("speed", kmh));
+  return withUnit ? `${value} ${unitOf("speed")}` : String(value);
+}
+
+function selectUnits(units) {
+  state.units = units;
+  try {
+    localStorage.setItem("units", units);
+  } catch {
+    // Not remembered; the choice still applies to this page.
+  }
+  for (const button of document.querySelectorAll("[data-units]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.units === units));
+  }
+  for (const span of document.querySelectorAll("[data-unit]")) {
+    span.textContent = unitOf(span.dataset.unit);
+  }
+  if (state.current) renderCurrent(state.current);
+  renderHistory();
 }
 
 // ---- Start -----------------------------------------------------------------
@@ -657,6 +731,10 @@ function start() {
   for (const button of document.querySelectorAll("[data-range]")) {
     button.addEventListener("click", () => selectRange(button.dataset.range));
   }
+  for (const button of document.querySelectorAll("[data-units]")) {
+    button.addEventListener("click", () => selectUnits(button.dataset.units));
+  }
+  selectUnits(state.units);
   let frame = 0;
   new ResizeObserver(() => {
     cancelAnimationFrame(frame);

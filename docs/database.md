@@ -35,6 +35,8 @@ CREATE TABLE readings (
     UNIQUE (station_id, reading_id)
 );
 CREATE INDEX readings_station_time ON readings (station_id, received_at);
+CREATE INDEX readings_station_reading_time
+    ON readings (station_id, COALESCE(device_time, received_at));
 ```
 
 Notes on the design:
@@ -55,8 +57,20 @@ Notes on the design:
   must be able to write the `-shm` side file. Then Grafana, which only has
   read permission, could not open the database. A reader can briefly delay a
   write, but the 5 s busy timeout covers that at one write per five minutes.
+- **Indexes are the time-ordered lookup.** Both are B-trees sorted by
+  station and time, so a range ("rain in the last 24 hours") reads only the
+  rows in that range. `readings_station_time` serves arrival-time queries
+  such as the soak report. `readings_station_reading_time` serves the
+  [read API](read-api.md), which places readings at their reading time.
+  Measured on 10 years of synthetic readings (1 million rows): the rain
+  totals query took 106 ms scanning every row and 0.3 ms with this index.
+  No running total or daily summary table is kept. Either would need
+  rewriting whenever a late reading arrives (M4 backfill), and the index
+  already makes sums over a range cheap.
 - `PRAGMA user_version` records the schema version (currently 1). A future
-  schema change updates the version and migrates from it.
+  schema change updates the version and migrates from it. Adding an index
+does not change the version: `CREATE INDEX IF NOT EXISTS` runs on every
+startup, and older code still reads the file.
 
 ## Useful queries
 

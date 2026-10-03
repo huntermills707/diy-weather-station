@@ -68,7 +68,7 @@ def latest(path: str, station: str) -> dict[str, Any] | None:
 
 
 def rain_totals(path: str, station: str, now: datetime, tz: ZoneInfo) -> dict[str, float]:
-    """Rain in the last hour, since local midnight, and since the 1st of the month.
+    """Rain in the last hour and 24 hours, since local midnight, and since the 1st.
 
     Each reading carries the tips of its own window, counted from zero, so
     summing windows is the cumulative total. A reboot only starts a new
@@ -79,6 +79,7 @@ def rain_totals(path: str, station: str, now: datetime, tz: ZoneInfo) -> dict[st
     midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
     starts = {
         "last_hour_mm": now - timedelta(hours=1),
+        "last_24h_mm": now - timedelta(hours=24),
         "today_mm": midnight,
         "month_mm": midnight.replace(day=1),
     }

@@ -12,6 +12,10 @@
   <header class="top">
     <h1>Weather station</h1>
     <p id="status" class="status" role="status">Loading…</p>
+    <div class="segmented units" role="group" aria-label="Units">
+      <button type="button" data-units="us" aria-pressed="false">°F · mph</button>
+      <button type="button" data-units="metric" aria-pressed="false">°C · km/h</button>
+    </div>
   </header>
 
   <main>
@@ -68,10 +72,10 @@
       </div>
       <p class="note" id="history-note"></p>
       <div class="charts">
-        <figure class="chart" data-chart="temp"><figcaption>Temperature <span>°C</span></figcaption><div class="plot"></div></figure>
+        <figure class="chart" data-chart="temp"><figcaption>Temperature <span data-unit="temp">°C</span></figcaption><div class="plot"></div></figure>
         <figure class="chart" data-chart="humidity"><figcaption>Humidity <span>%</span></figcaption><div class="plot"></div></figure>
         <figure class="chart" data-chart="pressure"><figcaption>Station pressure <span>hPa</span></figcaption><div class="plot"></div></figure>
-        <figure class="chart" data-chart="wind"><figcaption>Wind <span>km/h, average and gust</span></figcaption><div class="plot"></div></figure>
+        <figure class="chart" data-chart="wind"><figcaption>Wind <span><span data-unit="speed">km/h</span>, average and gust</span></figcaption><div class="plot"></div></figure>
         <figure class="chart" data-chart="rain"><figcaption>Rain <span>mm per interval</span></figcaption><div class="plot"></div></figure>
         <figure class="chart rose" data-chart="rose">
           <figcaption>Wind rose <span>share of readings by direction</span></figcaption>
