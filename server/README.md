@@ -7,10 +7,11 @@ Responsibilities:
 - Accept authenticated five-minute readings from the ESP32 over LAN-only HTTP
 - Validate payloads and store device + server timestamps in SQLite
 - Expose defined errors and a health endpoint
+- Serve a read API and the local dashboard (`dashboard/`, at `/`)
 - Run under systemd as a non-root user with journald logging
 
-The API is documented in [docs/ingest-api.md](../docs/ingest-api.md) and the
-SQLite schema in [docs/database.md](../docs/database.md). Interactive API docs
+The APIs are documented in [docs/ingest-api.md](../docs/ingest-api.md) and
+[docs/read-api.md](../docs/read-api.md), and the SQLite schema in [docs/database.md](../docs/database.md). Interactive API docs
 are served at `/docs` while the service runs.
 
 Tooling: `uv` for environment/dependencies, `ruff` for lint, `pytest` for tests.
@@ -44,6 +45,12 @@ Optional:
 
 - `WEATHER_STATION_DB_PATH` — SQLite file for readings; defaults to
   `weather.db` in the working directory. Created on startup if missing.
+- `WEATHER_STATION_ALTITUDE_M` — station altitude in metres, for sea-level
+  pressure. Unset, sea-level pressure is unavailable.
+- `WEATHER_STATION_TIMEZONE` — IANA zone (e.g. `America/Los_Angeles`) for
+  daily and monthly rain totals; defaults to the host's zone, else UTC.
+- `WEATHER_STATION_DASHBOARD_DIR` — folder served at `/`; defaults to the
+  repository's `dashboard/`.
 
 For local development, copy `.env.example` to `.env` (gitignored), fill in a
 token, and load it before starting the service:
