@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Weather station</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <h1>Weather station</h1>
+    <p id="status" class="status" role="status">Loading…</p>
+  </header>
+
+  <main>
+    <p id="banner" class="banner" hidden></p>
+
+    <section aria-labelledby="now-heading">
+      <h2 id="now-heading" class="visually-hidden">Current conditions</h2>
+      <div class="cards">
+        <article class="card" id="card-temp">
+          <h3>Temperature</h3>
+          <p class="value" data-field="temp"></p>
+          <p class="detail" data-field="temp-detail"></p>
+        </article>
+        <article class="card" id="card-humidity">
+          <h3>Humidity</h3>
+          <p class="value" data-field="humidity"></p>
+          <p class="detail" data-field="humidity-detail"></p>
+        </article>
+        <article class="card" id="card-pressure">
+          <h3>Pressure</h3>
+          <p class="value" data-field="pressure"></p>
+          <p class="detail" data-field="pressure-detail"></p>
+        </article>
+        <article class="card" id="card-rain">
+          <h3>Rain today</h3>
+          <p class="value" data-field="rain"></p>
+          <p class="detail" data-field="rain-detail"></p>
+        </article>
+        <article class="card" id="card-wind">
+          <h3>Wind</h3>
+          <div class="wind-now">
+            <svg class="compass" viewBox="-50 -50 100 100" aria-hidden="true">
+              <circle r="44" class="compass-ring"></circle>
+              <text y="-30" class="compass-label">N</text>
+              <g data-field="wind-arrow"><path d="M0 -38 L9 8 L0 2 L-9 8 Z" class="compass-arrow"></path></g>
+            </svg>
+            <div>
+              <p class="value" data-field="wind"></p>
+              <p class="detail" data-field="wind-detail"></p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="history-heading">
+      <div class="section-head">
+        <h2 id="history-heading">History</h2>
+        <div class="segmented" role="group" aria-label="Time range">
+          <button type="button" data-range="24h" aria-pressed="true">24 h</button>
+          <button type="button" data-range="7d" aria-pressed="false">7 days</button>
+          <button type="button" data-range="30d" aria-pressed="false">30 days</button>
+        </div>
+      </div>
+      <p class="note" id="history-note"></p>
+      <div class="charts">
+        <figure class="chart" data-chart="temp"><figcaption>Temperature <span>°C</span></figcaption><div class="plot"></div></figure>
+        <figure class="chart" data-chart="humidity"><figcaption>Humidity <span>%</span></figcaption><div class="plot"></div></figure>
+        <figure class="chart" data-chart="pressure"><figcaption>Station pressure <span>hPa</span></figcaption><div class="plot"></div></figure>
+        <figure class="chart" data-chart="wind"><figcaption>Wind <span>km/h, average and gust</span></figcaption><div class="plot"></div></figure>
+        <figure class="chart" data-chart="rain"><figcaption>Rain <span>mm per interval</span></figcaption><div class="plot"></div></figure>
+        <figure class="chart rose" data-chart="rose">
+          <figcaption>Wind rose <span>share of readings by direction</span></figcaption>
+          <div class="plot"></div>
+          <p class="detail" id="rose-detail"></p>
+        </figure>
+      </div>
+    </section>
+
+    <section aria-labelledby="health-heading">
+      <h2 id="health-heading">Station health</h2>
+      <dl class="health" id="health"></dl>
+    </section>
+  </main>
+
+  <footer>
+    <p>Times are in your local time zone. Raw data: <a href="/docs">API</a> · <a id="grafana-link" href="#">Grafana</a></p>
+  </footer>
+  <div id="tooltip" class="tooltip" hidden></div>
+</body>
+</html>
