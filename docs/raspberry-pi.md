@@ -23,6 +23,7 @@ deliberately left out.
 | Locale | `en_GB.UTF-8` (Raspberry Pi OS default), US keyboard layout |
 | SSH | Port 22. Key login for `weather`; password login also allowed (see below) |
 | Updates | `unattended-upgrades`: daily security and stable updates, no automatic reboot |
+| Logs | journald, persistent (`/var/log/journal`), overriding the Raspberry Pi OS volatile default |
 
 ## 1. Image the NVMe drive
 
@@ -79,6 +80,20 @@ occasionally, and reboot after kernel updates.
 Time sync needs no setup: `systemd-timesyncd` is enabled by default. Check it
 with `timedatectl`, which should show `System clock synchronized: yes`.
 
+Keep the journal across reboots, so logs from before a power cut survive.
+Raspberry Pi OS forces volatile storage in
+`/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf`; a later
+drop-in in `/etc` overrides it. journald's default size cap (10% of the file
+system, at most 4 GB) is fine on the NVMe drive.
+
+```sh
+sudo mkdir -p /etc/systemd/journald.conf.d
+printf '[Journal]\nStorage=persistent\n' \
+  | sudo tee /etc/systemd/journald.conf.d/50-persistent.conf
+sudo systemctl restart systemd-journald
+sudo journalctl --flush
+```
+
 ## 3. Application
 
 Follow [server/deploy/README.md](../server/deploy/README.md). It installs
@@ -132,6 +147,7 @@ any ports, which matches ADR 0001's LAN-only scope.
 cat /proc/device-tree/model; echo        # Raspberry Pi 5 Model B Rev 1.1
 grep PRETTY /etc/os-release              # Debian GNU/Linux 13 (trixie)
 timedatectl                               # synchronized: yes
+journalctl --list-boots                   # lists earlier boots too
 systemctl is-enabled unattended-upgrades apt-daily-upgrade.timer
 sudo unattended-upgrade --dry-run        # no errors
 ss -tln                                   # 22, 111, 3000, 8000
