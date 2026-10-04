@@ -8,10 +8,17 @@ from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from weather_station_server import db
-from weather_station_server.config import load_db_path, load_ingest_token
+from weather_station_server import db, read_api
+from weather_station_server.config import (
+    load_altitude,
+    load_dashboard_dir,
+    load_db_path,
+    load_ingest_token,
+    load_timezone,
+)
 from weather_station_server.models import Reading, ReadingReceipt
 
 # uvicorn configures its own loggers only; logging through its error logger
@@ -24,12 +31,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Fail fast at startup when required secrets are missing (issue #23).
     app.state.ingest_token = load_ingest_token()
     app.state.db_path = load_db_path()
+    app.state.timezone = load_timezone()
+    app.state.altitude_m = load_altitude()
     db.init_db(app.state.db_path)
     log.info("storing readings in %s", app.state.db_path)
+    log.info("rain totals in %s; altitude %s m", app.state.timezone.key, app.state.altitude_m)
     yield
 
 
 app = FastAPI(title="weather-station-server", lifespan=lifespan)
+app.include_router(read_api.router)
 
 
 def require_token(request: Request) -> None:
@@ -87,3 +98,8 @@ async def health(request: Request) -> JSONResponse:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     return JSONResponse({"status": "ok"})
+
+
+# The dashboard's static files, at / (dashboard/README.md). Mounted last so
+# the API routes above take precedence.
+app.mount("/", StaticFiles(directory=load_dashboard_dir(), html=True, check_dir=False))

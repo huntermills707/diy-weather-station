@@ -53,6 +53,18 @@ only the LAN, for example
 `sudo ufw allow from 192.168.68.0/22 to any port 8000 proto tcp` (use your
 subnet).
 
+Optionally set the station's altitude, so the dashboard can show sea-level
+pressure ([docs/read-api.md](../../docs/read-api.md#derived-metrics)):
+
+```sh
+echo "WEATHER_STATION_ALTITUDE_M=50" | sudo tee -a /etc/weather-station/env   # your altitude
+sudo systemctl restart weather-station
+```
+
+Rain totals use the Pi's time zone for days and months
+(`timedatectl` shows it); set `WEATHER_STATION_TIMEZONE` the same way to
+override it.
+
 Then point the station at the Pi: in `firmware/secrets.h`, set
 `INGEST_URL` to `http://<pi-address>:8000/readings` and `INGEST_TOKEN` to the
 token from step 4. Then re-upload the firmware.
@@ -70,6 +82,7 @@ sudo systemctl restart weather-station
 ```sh
 systemctl status weather-station          # active (running), enabled
 curl -s localhost:8000/health             # {"status":"ok"}
+curl -s localhost:8000/api/current        # latest reading, rain totals, health
 journalctl -u weather-station -f          # startup line and one POST per reading
 sqlite3 /var/lib/weather-station/weather.db \
   'SELECT received_at, reading_id, temp_c FROM readings ORDER BY id DESC LIMIT 5'
@@ -88,6 +101,13 @@ sudo reboot                                   # then, after it comes back:
 curl -s <pi-address>:8000/health              # from another machine on the LAN
 journalctl -u weather-station -b              # this boot's logs
 ```
+
+## Dashboard
+
+The service serves the dashboard ([docs/dashboard.md](../../docs/dashboard.md))
+from the checkout's `dashboard/` folder. Open `http://<pi-address>:8000/` on
+any device on the LAN. Nothing else to install: `git pull` and a restart
+update it like the rest of the service.
 
 ## Grafana charts
 
