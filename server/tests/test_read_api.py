@@ -12,7 +12,11 @@ from weather_station_server import history
 from weather_station_server.config import ALTITUDE_ENV_VAR
 from weather_station_server.db import init_db, utc_text
 
-NOW = datetime.now(UTC)
+
+@pytest.fixture
+def now() -> datetime:
+    """This test's start time; the server measures reading ages from its own clock."""
+    return datetime.now(UTC)
 
 
 def insert(path: Path, time: datetime, received: datetime | None = None, **overrides: Any) -> None:
@@ -49,10 +53,10 @@ def test_current_with_no_readings(client: TestClient) -> None:
 
 
 def test_current_returns_latest_reading_with_derived_metrics(
-    client: TestClient, db_path: Path
+    client: TestClient, db_path: Path, now: datetime
 ) -> None:
-    insert(db_path, NOW - timedelta(minutes=10), temp_c=10.0)
-    insert(db_path, NOW - timedelta(minutes=5), temp_c=25.0, rh_pct=60.0, wind_dir_deg=225.0)
+    insert(db_path, now - timedelta(minutes=10), temp_c=10.0)
+    insert(db_path, now - timedelta(minutes=5), temp_c=25.0, rh_pct=60.0, wind_dir_deg=225.0)
 
     body = client.get("/api/current").json()
 
@@ -65,21 +69,25 @@ def test_current_returns_latest_reading_with_derived_metrics(
     assert body["derived"]["altitude_m"] is None
 
 
-def test_current_uses_configured_altitude(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_current_uses_configured_altitude(
+    db_path: Path, monkeypatch: pytest.MonkeyPatch, now: datetime
+) -> None:
     monkeypatch.setenv(ALTITUDE_ENV_VAR, "100")
     from weather_station_server.main import app
 
     with TestClient(app) as client:
-        insert(db_path, NOW, press_hpa=1000.0, temp_c=15.0)
+        insert(db_path, now, press_hpa=1000.0, temp_c=15.0)
         derived = client.get("/api/current").json()["derived"]
     assert derived["altitude_m"] == 100
     assert derived["sea_level_hpa"] == pytest.approx(1011.9, abs=0.1)
 
 
-def test_current_failed_sensor_gives_unavailable_metrics(client: TestClient, db_path: Path) -> None:
+def test_current_failed_sensor_gives_unavailable_metrics(
+    client: TestClient, db_path: Path, now: datetime
+) -> None:
     insert(
         db_path,
-        NOW,
+        now,
         temp_c=None,
         rh_pct=None,
         press_hpa=None,
@@ -93,30 +101,34 @@ def test_current_failed_sensor_gives_unavailable_metrics(client: TestClient, db_
     assert body["health"]["bme280"] == "error"
 
 
-def test_current_health_fresh_and_stale(client: TestClient, db_path: Path) -> None:
-    insert(db_path, NOW - timedelta(minutes=3))
+def test_current_health_fresh_and_stale(client: TestClient, db_path: Path, now: datetime) -> None:
+    insert(db_path, now - timedelta(minutes=3))
     health = client.get("/api/current").json()["health"]
     assert health["stale"] is False
     assert health["age_s"] == pytest.approx(180, abs=5)
     assert health["clock_synced"] is True
 
-    insert(db_path, NOW - timedelta(minutes=12), received=NOW - timedelta(minutes=12))
+    insert(db_path, now - timedelta(minutes=12), received=now - timedelta(minutes=12))
     # The latest reading is still 3 minutes old.
     assert client.get("/api/current").json()["health"]["stale"] is False
 
 
-def test_current_stale_after_two_missed_readings(client: TestClient, db_path: Path) -> None:
-    insert(db_path, NOW - timedelta(minutes=12))
+def test_current_stale_after_two_missed_readings(
+    client: TestClient, db_path: Path, now: datetime
+) -> None:
+    insert(db_path, now - timedelta(minutes=12))
     health = client.get("/api/current").json()["health"]
     assert health["stale"] is True
     assert health["stale_after_s"] == 660
 
 
-def test_current_health_counts_readings_and_boots(client: TestClient, db_path: Path) -> None:
+def test_current_health_counts_readings_and_boots(
+    client: TestClient, db_path: Path, now: datetime
+) -> None:
     for i in range(1, 4):
-        insert(db_path, NOW - timedelta(minutes=40 - 5 * i), reading_id=f"aaaa0000-{i}")
-    insert(db_path, NOW - timedelta(minutes=2), reading_id="bbbb1111-1", uptime_ms=15000)
-    insert(db_path, NOW - timedelta(hours=30), reading_id="cccc2222-9")
+        insert(db_path, now - timedelta(minutes=40 - 5 * i), reading_id=f"aaaa0000-{i}")
+    insert(db_path, now - timedelta(minutes=2), reading_id="bbbb1111-1", uptime_ms=15000)
+    insert(db_path, now - timedelta(hours=30), reading_id="cccc2222-9")
 
     health = client.get("/api/current").json()["health"]
     assert health["readings_24h"] == 4
@@ -126,8 +138,8 @@ def test_current_health_counts_readings_and_boots(client: TestClient, db_path: P
     assert health["uptime_s"] == 15
 
 
-def test_current_unsynced_reading(client: TestClient, db_path: Path) -> None:
-    insert(db_path, NOW, device_time=None)
+def test_current_unsynced_reading(client: TestClient, db_path: Path, now: datetime) -> None:
+    insert(db_path, now, device_time=None)
     body = client.get("/api/current").json()
     assert body["health"]["clock_synced"] is False
     assert body["health"]["clock_offset_s"] is None
@@ -203,9 +215,9 @@ def test_rain_totals_across_reboot_are_not_negative_or_inflated(db_path: Path) -
 
 
 def test_rain_duplicate_submission_is_counted_once(
-    client: TestClient, auth: dict, db_path: Path
+    client: TestClient, auth: dict, db_path: Path, now: datetime
 ) -> None:
-    reading = make_reading(device_time=iso(NOW), rain_tips=2, rain_mm=0.56)
+    reading = make_reading(device_time=iso(now), rain_tips=2, rain_mm=0.56)
     assert client.post("/readings", json=reading, headers=auth).status_code == 201
     assert client.post("/readings", json=reading, headers=auth).status_code == 200
     assert client.get("/api/current").json()["rain"]["last_hour_mm"] == 0.56
@@ -329,9 +341,11 @@ def test_series_only_returns_the_requested_station(client: TestClient, db_path: 
     assert series(client, START, START + timedelta(hours=1))["points"] == []
 
 
-def test_series_defaults_to_the_last_24_hours(client: TestClient, db_path: Path) -> None:
-    insert(db_path, NOW - timedelta(hours=2))
-    insert(db_path, NOW - timedelta(hours=25))
+def test_series_defaults_to_the_last_24_hours(
+    client: TestClient, db_path: Path, now: datetime
+) -> None:
+    insert(db_path, now - timedelta(hours=2))
+    insert(db_path, now - timedelta(hours=25))
     body = client.get("/api/series").json()
     assert body["bucket_s"] == 300
     assert len(body["points"]) == 1
@@ -436,8 +450,8 @@ def test_read_api_reports_unreadable_database(client: TestClient, db_path: Path)
         assert response.json() == {"detail": "Database unavailable"}
 
 
-def test_read_api_never_writes(client: TestClient, db_path: Path) -> None:
-    insert(db_path, NOW)
+def test_read_api_never_writes(client: TestClient, db_path: Path, now: datetime) -> None:
+    insert(db_path, now)
     before = db_path.stat().st_mtime_ns
     for path in ("/api/current", "/api/series", "/api/wind"):
         assert client.get(path).status_code == 200
