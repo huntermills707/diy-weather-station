@@ -277,7 +277,7 @@ function setRain(data) {
     ["24 h", rain.last_24h_mm],
     ["this month", rain.month_mm],
   ]
-    .map(([label, mm]) => `${label}\u00a0${fixed(mm, 1)}\u00a0mm`)
+    .map(([label, mm]) => `${label.replaceAll(" ", "\u00a0")}\u00a0${fixed(mm, 1)}\u00a0mm`)
     .join(" · ");
   if (data.timezone !== browserZone) detail += ` (days in ${data.timezone})`;
   setText("rain-detail", detail);
