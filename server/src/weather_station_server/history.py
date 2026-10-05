@@ -3,6 +3,9 @@
 A reading's time is ``device_time``, or ``received_at`` while the station's
 clock was unsynced (docs/database.md). Connections are read-only, so these
 queries can never change stored data.
+
+A value that a data-quality flag questions (docs/data-quality.md) is left out
+of averages, totals, and the wind rose, and counted as flagged instead.
 """
 
 import math
@@ -13,10 +16,10 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from weather_station_server.db import utc_text
+from weather_station_server import quality
+from weather_station_server.db import READING_TIME, utc_text
 
 CADENCE_S = 300
-READING_TIME = "COALESCE(device_time, received_at)"
 # Bucket sizes for downsampling, smallest first; the series uses the smallest
 # one that keeps the range within MAX_POINTS.
 BUCKETS_S = (300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400)
@@ -64,7 +67,9 @@ def latest(path: str, station: str) -> dict[str, Any] | None:
             "ORDER BY time DESC LIMIT 1",
             (station,),
         ).fetchone()
-    return dict(row) if row else None
+    if row is None:
+        return None
+    return {**dict(row), "quality": row["quality"].split()}
 
 
 def rain_totals(path: str, station: str, now: datetime, tz: ZoneInfo) -> dict[str, float]:
@@ -90,7 +95,8 @@ def rain_totals(path: str, station: str, now: datetime, tz: ZoneInfo) -> dict[st
     params = {name: utc_text(start) for name, start in starts.items()}
     with closing(connect_ro(path)) as conn:
         row = conn.execute(
-            f"SELECT {columns} FROM (SELECT {READING_TIME} AS time, rain_mm FROM readings "
+            f"SELECT {columns} FROM (SELECT {READING_TIME} AS time, "
+            f"{quality.usable_sql('rain_mm')} AS rain_mm FROM readings "
             "WHERE station_id = :station) WHERE time > :earliest",
             {**params, "station": station, "earliest": min(params.values())},
         ).fetchone()
@@ -98,16 +104,17 @@ def rain_totals(path: str, station: str, now: datetime, tz: ZoneInfo) -> dict[st
 
 
 def recent_activity(path: str, station: str, now: datetime) -> dict[str, int]:
-    """Readings stored and boots seen in the last 24 hours."""
+    """Readings stored, boots seen, and readings flagged in the last 24 hours."""
     with closing(connect_ro(path)) as conn:
-        ids = [
-            row[0]
-            for row in conn.execute(
-                f"SELECT reading_id FROM readings WHERE station_id = ? AND {READING_TIME} > ?",
-                (station, utc_text(now - timedelta(hours=24))),
-            )
-        ]
-    return {"readings_24h": len(ids), "boots_24h": len({boot_id(i) for i in ids})}
+        rows = conn.execute(
+            f"SELECT reading_id, quality FROM readings WHERE station_id = ? AND {READING_TIME} > ?",
+            (station, utc_text(now - timedelta(hours=24))),
+        ).fetchall()
+    return {
+        "readings_24h": len(rows),
+        "boots_24h": len({boot_id(row["reading_id"]) for row in rows}),
+        "flagged_24h": sum(1 for row in rows if row["quality"]),
+    }
 
 
 def series(
@@ -121,8 +128,12 @@ def series(
     the line instead of drawing across missing data. The quiet time is
     measured between actual readings, not bucket means, so timing jitter
     that puts two readings in one bucket never looks like a gap.
+
+    Flagged values are left out; ``flagged`` counts the readings in a bucket
+    with any flag.
     """
     epoch = "CAST(strftime('%s', time) AS INTEGER)"
+    usable = ", ".join(f"{quality.usable_sql(name)} AS {name}" for name in quality.FIELD_PREFIXES)
     with closing(connect_ro(path)) as conn:
         rows = conn.execute(
             f"""
@@ -134,8 +145,10 @@ def series(
                    avg(press_hpa) AS press_hpa,
                    avg(wind_avg_kmh) AS wind_avg_kmh,
                    max(wind_peak_kmh) AS wind_peak_kmh,
-                   sum(rain_mm) AS rain_mm
-            FROM (SELECT {READING_TIME} AS time, * FROM readings WHERE station_id = :station)
+                   sum(rain_mm) AS rain_mm,
+                   sum(quality != '') AS flagged
+            FROM (SELECT {READING_TIME} AS time, quality, {usable}
+                  FROM readings WHERE station_id = :station)
             WHERE time >= :start AND time < :end
             GROUP BY bucket ORDER BY bucket
             """,
@@ -170,7 +183,7 @@ def _gap(epoch: float) -> dict[str, Any]:
     names = (
         "temp_c temp_min_c temp_max_c rh_pct press_hpa wind_avg_kmh wind_peak_kmh rain_mm".split()
     )
-    return {"time": _epoch_text(epoch), "n": 0, **dict.fromkeys(names)}
+    return {"time": _epoch_text(epoch), "n": 0, "flagged": 0, **dict.fromkeys(names)}
 
 
 def sector_of(direction_deg: float) -> int:
@@ -192,17 +205,20 @@ def wind_rose(path: str, station: str, start: datetime, end: datetime) -> dict[s
 
     A reading without a vane heading is ``unknown``, never put in a sector.
     A reading with a heading but an average below CALM_KMH is ``calm``.
+    A reading whose average speed is flagged is ``flagged``.
     """
     counts = [[0] * len(SPEED_CLASSES_KMH) for _ in SECTOR_LABELS]
-    calm = unknown = 0
+    calm = unknown = flagged = 0
     with closing(connect_ro(path)) as conn:
         rows = conn.execute(
-            f"SELECT wind_dir_deg, wind_avg_kmh FROM readings WHERE station_id = ? "
+            f"SELECT wind_dir_deg, wind_avg_kmh, quality FROM readings WHERE station_id = ? "
             f"AND {READING_TIME} >= ? AND {READING_TIME} < ?",
             (station, utc_text(start), utc_text(end)),
         ).fetchall()
-    for direction, speed in rows:
-        if direction is None:
+    for direction, speed, flags in rows:
+        if quality.is_flagged(flags, "wind_avg_kmh"):
+            flagged += 1
+        elif direction is None:
             unknown += 1
         elif speed < CALM_KMH:
             calm += 1
@@ -212,6 +228,7 @@ def wind_rose(path: str, station: str, start: datetime, end: datetime) -> dict[s
         "total": len(rows),
         "calm": calm,
         "unknown": unknown,
+        "flagged": flagged,
         "calm_below_kmh": CALM_KMH,
         "speed_classes_kmh": list(SPEED_CLASSES_KMH),
         "sectors": [

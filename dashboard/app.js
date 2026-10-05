@@ -90,6 +90,10 @@ function el(tag, attrs = {}, text) {
   return node;
 }
 
+function plural(n, word) {
+  return n === 1 ? word : `${word}s`;
+}
+
 function field(name) {
   return document.querySelector(`[data-field="${name}"]`);
 }
@@ -200,7 +204,8 @@ function renderCurrent(data) {
     banner.hidden = false;
     banner.textContent =
       `No reading since ${fmtDayTime.format(received)}. The station or its WiFi may be down; ` +
-      "the values below are from that last reading.";
+      "the values below are from that last reading. The station keeps up to 24 hours of " +
+      "readings while offline and sends them when it reconnects.";
   } else {
     status.className = "status ok";
     status.textContent = `Updated ${duration(health.age_s)} ago · ${fmtTime.format(received)}`;
@@ -208,6 +213,20 @@ function renderCurrent(data) {
 
   renderConditions(data);
   renderHealth(data);
+}
+
+// Why a field of the latest reading is suspect (docs/data-quality.md), or null.
+function suspectReason(reading, prefix) {
+  const flag = reading.quality.find((f) => f.startsWith(prefix));
+  if (!flag) return null;
+  return flag.endsWith("_stuck") ? "Suspect: unchanged for 2 h" : "Suspect: outside plausible range";
+}
+
+// Shows a suspect warning in place of a card's detail line; returns whether it did.
+function markSuspect(name, reason) {
+  field(`${name}-detail`).classList.toggle("warn", Boolean(reason));
+  if (reason) setText(`${name}-detail`, reason);
+  return Boolean(reason);
 }
 
 function renderConditions(data) {
@@ -265,6 +284,12 @@ function renderConditions(data) {
   }
   setText("wind-detail", parts.join(" · "));
 
+  // Flagged values stay visible: they are what the station sent.
+  markSuspect("temp", suspectReason(r, "temp_"));
+  markSuspect("humidity", suspectReason(r, "rh_"));
+  markSuspect("pressure", suspectReason(r, "press_"));
+  markSuspect("wind", suspectReason(r, "wind_") || suspectReason(r, "gust_"));
+
   setRain(data);
 }
 
@@ -318,8 +343,31 @@ function renderHealth(data) {
     ],
     ["WiFi signal", signal, signalClass],
     ["BME280 sensor", ...sensor[h.bme280]],
-    ["Last reading ID", r.reading_id, ""],
+    [
+      "Data quality, last 24 h",
+      h.flagged_24h ? `${h.flagged_24h} ${plural(h.flagged_24h, "reading")} flagged` : "None flagged",
+      h.flagged_24h ? "warn" : "",
+    ],
   ];
+  // Reboot and queue telemetry: absent from firmware before M4.
+  if (r.boot_count != null) {
+    const crash = ["task_watchdog", "int_watchdog", "watchdog", "panic", "brownout"];
+    items.push([
+      "Last reboot",
+      `#${r.boot_count} (${r.reset_reason.replaceAll("_", " ")})`,
+      crash.includes(r.reset_reason) ? "warn" : "",
+    ]);
+  }
+  if (r.queue_dropped != null) {
+    items.push([
+      "Upload queue",
+      r.queue_dropped
+        ? `${r.queue_dropped} ${plural(r.queue_dropped, "reading")} dropped (queue full)`
+        : "Nothing dropped",
+      r.queue_dropped ? "warn" : "",
+    ]);
+  }
+  items.push(["Last reading ID", r.reading_id, ""]);
   const list = document.getElementById("health");
   list.replaceChildren(
     ...items.map(([label, value, cls]) => {
@@ -578,6 +626,7 @@ function attachTooltip(plot, svg, cursor, spec, points, x, bucketS) {
     const lines = [bucketS > 300 ? `${fmtDateTime.format(when)} (avg of ${best.n})` : fmtDateTime.format(when)];
     const unit = spec.quantity ? unitOf(spec.quantity) : spec.unit;
     for (const item of items) lines.push(`${item.label}: ${fixed(best[item.key], spec.digits)} ${unit}`);
+    if (best.flagged) lines.push(`${best.flagged} flagged ${plural(best.flagged, "reading")} left out`);
     tooltip.textContent = lines.join("\n");
     tooltip.hidden = false;
     const left = Math.min(event.clientX + 12, window.innerWidth - tooltip.offsetWidth - 8);
@@ -621,7 +670,8 @@ function drawRose(plot, rose) {
   detail.textContent =
     `${rose.total} readings · calm (below ${speedText(rose.calm_below_kmh)}) ${rose.calm} ` +
     `(${pct(rose.calm)})` +
-    ` · direction unknown ${rose.unknown} (${pct(rose.unknown)})`;
+    ` · direction unknown ${rose.unknown} (${pct(rose.unknown)})` +
+    (rose.flagged ? ` · flagged ${rose.flagged} (${pct(rose.flagged)})` : "");
 
   const totals = rose.sectors.map((s) => s.counts.reduce((a, b) => a + b, 0));
   const most = Math.max(...totals);

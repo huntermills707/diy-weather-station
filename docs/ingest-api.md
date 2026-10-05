@@ -42,7 +42,13 @@ that has no valid number. The station sends `null` and never a fake value.
 | `rh_pct` | number or null | 0-100 | BME280 relative humidity |
 | `press_hpa` | number or null | 300-1100 | BME280 station pressure |
 | `bme280` | string | `ok`, `implausible`, `error` | Sensor status. The three BME280 numbers must be present exactly when this is `ok` |
-| `rssi_dbm` | integer or null | -127 to 0 | WiFi signal strength when the reading was sent |
+| `rssi_dbm` | integer or null | -127 to 0 | WiFi signal strength when the reading was taken |
+| `boot_count` | integer, optional | ≥ 0 | Station boots since flashing, kept in flash. Diagnoses resets |
+| `reset_reason` | string, optional | 1-32 chars, `[a-z_]` | Why the station last booted: `power_on`, `external`, `software`, `panic`, `task_watchdog`, `int_watchdog`, `watchdog`, `brownout`, `deep_sleep`, `unknown` |
+| `queue_dropped` | integer, optional | ≥ 0 | Readings the station dropped since boot because its upload queue was full |
+
+The three optional fields arrived with M4; firmware from before then omits
+them and they are stored as `NULL`.
 
 Unknown fields are rejected, so a typo cannot silently drop data.
 
@@ -84,6 +90,34 @@ the same: the reading is delivered.
 
 Because IDs are sequential, a gap in `seq` within one `boot_id` means a lost
 reading, and a new `boot_id` means the station rebooted.
+
+### Delivery, queueing, and backfill
+
+The station puts every reading in a bounded queue in RAM and sends the
+oldest first (JAE-60):
+
+- **Capacity:** 288 readings (24 hours). When it is full, the **oldest**
+  reading is dropped to make room, logged on serial, and counted in
+  `queue_dropped`. Newer data is worth more than older data.
+- **Retries:** a reading that fails stays at the front. Retries back off
+  10 s, 20 s, 40 s … up to 5 minutes, and the backoff resets after a
+  success. Once a send succeeds, the rest of the queue follows one per
+  `loop()`.
+- **Which failures retry:** no response, `401`, `503`, and other `5xx`
+  retry. `400`, `413`, and `422` mean the server will never accept the
+  payload, so that reading is dropped and logged rather than blocking the
+  queue.
+- **Unsynced clock:** a reading taken before the first NTP sync gets its
+  `device_time` filled in at send time once the clock is set, counted back
+  from its `uptime_ms`. Only a reading sent before any sync still has
+  `device_time: null`.
+- **Reboot or power loss empties the queue.**
+
+On the server, a late reading is stored with its own `device_time` and
+lands in the right place in history ([read-api.md](read-api.md)), whatever
+order it arrives in (JAE-61). The station's queue and the unique
+`(station_id, reading_id)` together make delivery at-least-once and storage
+exactly-once.
 
 ### Responses
 

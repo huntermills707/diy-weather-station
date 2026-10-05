@@ -64,7 +64,11 @@ The latest reading, with derived metrics, rain totals, and station health.
     "rh_pct": 35.7,
     "press_hpa": 1005.1,
     "bme280": "ok",
-    "rssi_dbm": -66
+    "rssi_dbm": -66,
+    "boot_count": 12,
+    "reset_reason": "power_on",
+    "queue_dropped": 0,
+    "quality": []
   },
   "derived": {
     "dew_point_c": 13.8,
@@ -82,6 +86,7 @@ The latest reading, with derived metrics, rain totals, and station health.
     "readings_24h": 278,
     "expected_24h": 288,
     "boots_24h": 1,
+    "flagged_24h": 0,
     "clock_synced": true,
     "clock_offset_s": 0.9,
     "rssi_dbm": -66,
@@ -92,7 +97,9 @@ The latest reading, with derived metrics, rain totals, and station health.
 
 - `reading` has the stored columns ([database.md](database.md)) plus `time`
   (the reading time above) and `wind_dir_label`, the 16-point compass name
-  of the heading (`null` when the vane reads unknown).
+  of the heading (`null` when the vane reads unknown). `quality` is a list
+  of [data-quality flags](data-quality.md), empty for a clean reading.
+  Flagged values are still returned as stored.
 - `reading`, `derived`, and `health` are `null` when the station has no
   readings yet. `rain` is always present.
 - `health.age_s` is the time since the server received the latest reading.
@@ -101,6 +108,7 @@ The latest reading, with derived metrics, rain totals, and station health.
   second late one is.
 - `readings_24h` and `boots_24h` count readings and distinct boot IDs in the
   last 24 hours. More than one boot means the station rebooted.
+  `flagged_24h` counts readings with any quality flag.
 - `clock_offset_s` is `received_at` minus `device_time`: clock offset plus
   delivery delay. `null` while the clock is unsynced.
 
@@ -120,6 +128,7 @@ never go negative or count tips twice. The station's own since-boot counter
 (`rain_total`) is not used. A retried reading is stored once (unique
 `reading_id`), so it is never added twice. Tips during the reboot itself,
 before the new window starts, are not counted.
+Rain [flagged](data-quality.md) as implausible is not added.
 
 **Time zone.** Days and months follow `timezone` in the response: the
 `WEATHER_STATION_TIMEZONE` setting, else the server's own zone (the Pi's is
@@ -131,7 +140,8 @@ five minutes of rain can land on the wrong side of midnight.
 ### Derived metrics
 
 Every derived value is `null` when any of its inputs is `null` (for example
-`bme280` is `error`), so a failed sensor never produces a made-up number.
+`bme280` is `error`) or [flagged](data-quality.md), so a failed sensor never
+produces a made-up number.
 Code: `server/src/weather_station_server/derived.py`.
 
 **Dew point:** the Magnus formula with the Alduchov and Eskridge (1996)
@@ -177,6 +187,7 @@ Readings over a range, downsampled on the server.
     {
       "time": "2026-10-02T22:12:39.000Z",
       "n": 1,
+      "flagged": 0,
       "temp_c": 30.58, "temp_min_c": 30.58, "temp_max_c": 30.58,
       "rh_pct": 30.9,
       "press_hpa": 1007.0,
@@ -208,8 +219,9 @@ point has:
   lowest and highest temperature (`temp_min_c`, `temp_max_c`); the highest
   gust (`wind_peak_kmh`); and the total `rain_mm`
 
-Missing sensor values are left out of the averages. If a bucket has no valid
-value for a field, that field is `null`.
+Missing sensor values are left out of the averages, and so are
+[flagged](data-quality.md) ones. If a bucket has no valid value for a field,
+that field is `null`. `flagged` counts the bucket's readings with any flag.
 
 **Gaps stay gaps.** Only buckets with readings are returned. Where no
 reading arrived for longer than one bucket plus half a cadence, a **gap
@@ -232,6 +244,7 @@ A wind rose: readings counted by direction and average speed.
   "total": 2016,
   "calm": 361,
   "unknown": 16,
+  "flagged": 0,
   "calm_below_kmh": 2.0,
   "speed_classes_kmh": [2.0, 10.0, 20.0, 30.0],
   "sectors": [
@@ -241,17 +254,19 @@ A wind rose: readings counted by direction and average speed.
 }
 ```
 
-Each reading in the range goes into exactly one of three places:
+Each reading in the range goes into exactly one of four places:
 
-1. **`unknown`**: the vane read open or shorted (`wind_dir_deg` is null).
+1. **`flagged`**: the average speed is [flagged](data-quality.md) as
+   implausible.
+2. **`unknown`**: the vane read open or shorted (`wind_dir_deg` is null).
    These are never put in a direction, whatever the speed.
-2. **`calm`**: a heading but an average below 2 km/h (about 1 knot, the WMO
+3. **`calm`**: a heading but an average below 2 km/h (about 1 knot, the WMO
    calm limit). In still air the vane just keeps its last position, so its
    heading means nothing.
-3. **A sector**: one of 16 sectors of 22.5°, centred on N, NNE, NE, … (the
+4. **A sector**: one of 16 sectors of 22.5°, centred on N, NNE, NE, … (the
    vane's own 16 headings). A heading exactly on a boundary goes to the
    clockwise sector. Inside the sector, `counts[i]` counts readings whose
    average speed is at least `speed_classes_kmh[i]` and below the next edge
    (2-10, 10-20, 20-30, 30+ km/h).
 
-So `total = calm + unknown + the sum of every sector's counts`.
+So `total = flagged + calm + unknown + the sum of every sector's counts`.
