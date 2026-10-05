@@ -1,10 +1,13 @@
 #include <Arduino.h>
+#include <Preferences.h>
 #include <SparkFunBME280.h>
 #include <Wire.h>
 #include <esp_random.h>
+#include <esp_task_wdt.h>
 
 #include "network.h"
 #include "reading.h"
+#include "upload_queue.h"
 #include "weather_meters.h"
 
 // Identifies this station's readings on the server (docs/ingest-api.md).
@@ -15,6 +18,11 @@ constexpr uint32_t SAMPLE_WINDOW_MS = 5UL * 60UL * 1000UL;
 constexpr uint32_t LIVE_WIND_PRINT_MS = 1000;
 constexpr uint32_t CAL_PRINT_MS = 500;
 
+// Task watchdog (JAE-62): if loop() stops running for this long, the ESP32
+// panics and reboots. The slowest legitimate step is one POST, bounded at
+// about 2 x HTTP_TIMEOUT_MS.
+constexpr uint32_t WATCHDOG_TIMEOUT_S = 30;
+
 BME280 bme280;
 bool bme280Ok = false;
 bool calMode = false;
@@ -23,7 +31,11 @@ bool calMode = false;
 // so retries reuse it and gaps or reboots show up on the server.
 uint32_t bootId = 0;
 uint32_t readingSeq = 0;
-uint32_t uploadFailures = 0;
+
+// Reboot telemetry sent with every reading, so resets are diagnosable on the
+// server: a lifetime boot counter kept in flash, and why this boot happened.
+uint32_t bootCount = 0;
+const char* resetReason = "unknown";
 
 uint32_t nextWindowAt = 0;
 uint32_t nextWindPrintAt = 0;
@@ -35,6 +47,41 @@ static void beginBme280() {
     // Carrier BME280 sits at I2C address 0x77 (the library default).
     bme280Ok = bme280.beginI2C(Wire);
     Serial.println(bme280Ok ? "bme280: ready" : "bme280: ERROR no response at 0x77");
+}
+
+static const char* resetReasonText(esp_reset_reason_t reason) {
+    switch (reason) {
+        case ESP_RST_POWERON:
+            return "power_on";
+        case ESP_RST_EXT:
+            return "external";
+        case ESP_RST_SW:
+            return "software";
+        case ESP_RST_PANIC:
+            return "panic";
+        case ESP_RST_INT_WDT:
+            return "int_watchdog";
+        case ESP_RST_TASK_WDT:
+            return "task_watchdog";
+        case ESP_RST_WDT:
+            return "watchdog";
+        case ESP_RST_DEEPSLEEP:
+            return "deep_sleep";
+        case ESP_RST_BROWNOUT:
+            return "brownout";
+        default:
+            return "unknown";
+    }
+}
+
+// Counts this boot in NVS. One small write per boot is no flash-wear concern.
+static uint32_t countBoot() {
+    Preferences prefs;
+    prefs.begin("station", false);
+    uint32_t count = prefs.getUInt("boots", 0) + 1;
+    prefs.putUInt("boots", count);
+    prefs.end();
+    return count;
 }
 
 static bool plausible(float tempC, float pressPa, float rh) {
@@ -50,8 +97,8 @@ static Reading takeReading() {
     Reading r = {};
     snprintf(r.readingId, sizeof(r.readingId), "%08lx-%lu", (unsigned long)bootId,
              (unsigned long)++readingSeq);
-    formatUtcNow(r.deviceTime, sizeof(r.deviceTime));
     r.uptimeMs = millis();
+    formatUtcAt(r.uptimeMs, r.deviceTime, sizeof(r.deviceTime));
     // Rounded, and at least 1 s so an immediate `s` still sends a valid window.
     r.windowS = max<uint32_t>(1, (w.durationMs + 500) / 1000);
     r.rainTips = w.rainTips;
@@ -80,6 +127,9 @@ static Reading takeReading() {
 
     r.rssiValid = networkConnected();
     r.rssiDbm = r.rssiValid ? networkRssi() : 0;
+    r.bootCount = bootCount;
+    r.resetReason = resetReason;
+    r.queueDropped = uploadQueueDropped();
     return r;
 }
 
@@ -106,39 +156,17 @@ static void printReading(const Reading& r) {
     Serial.println();
 }
 
-// One attempt per reading; a failed reading is logged and dropped. Queuing
-// and retrying failed uploads is M4 work (bounded queue, ADR 0001).
-static void uploadReading(const Reading& r) {
-    char json[512];
-    if (!readingToJson(r, STATION_ID, json, sizeof(json))) {
-        Serial.printf("upload: id=%s FAILED payload too large\n", r.readingId);
-        uploadFailures++;
-        return;
-    }
-    int code = postReading(json);
-    if (code == 200 || code == 201) {
-        Serial.printf("upload: id=%s ok (%d)\n", r.readingId, code);
-        return;
-    }
-    uploadFailures++;
-    if (code == POST_NOT_CONNECTED) {
-        Serial.printf("upload: id=%s FAILED no wifi (failures=%lu)\n", r.readingId,
-                      (unsigned long)uploadFailures);
-    } else {
-        // Negative codes are HTTPClient errors (-1 refused, -11 read timeout).
-        Serial.printf("upload: id=%s FAILED code=%d (failures=%lu)\n", r.readingId, code,
-                      (unsigned long)uploadFailures);
-    }
-}
-
 static void report() {
     Reading r = takeReading();
     printReading(r);
-    uploadReading(r);
+    // Sent by uploadQueuePoll(), right away unless older readings are waiting.
+    uploadQueuePush(r);
 }
 
 static void printHelp() {
-    Serial.println("commands: s=sample report now, c=toggle calibration stream, h=help");
+    Serial.println(
+        "commands: s=sample report now, q=upload queue status, c=toggle calibration stream, "
+        "x=hang (watchdog test), h=help");
 }
 
 static void handleSerial() {
@@ -158,6 +186,16 @@ static void handleSerial() {
                 }
                 Serial.println(calMode ? "calibration stream on" : "calibration stream off");
                 break;
+            case 'q':
+                uploadQueuePrintStatus();
+                break;
+            case 'x':
+                // Stops loop() so the watchdog fires; the next boot reports
+                // reset_reason=task_watchdog.
+                Serial.printf("hanging: the watchdog should reboot in %lu s\n",
+                              (unsigned long)WATCHDOG_TIMEOUT_S);
+                for (;;) {
+                }
             case 'h':
                 printHelp();
                 break;
@@ -171,6 +209,9 @@ void setup() {
     Serial.begin(115200);
     delay(1000);  // let USB-serial settle before first print
     Serial.println("weather station firmware up");
+    bootCount = countBoot();
+    resetReason = resetReasonText(esp_reset_reason());
+    Serial.printf("boot #%lu, reset reason %s\n", (unsigned long)bootCount, resetReason);
     printHelp();
 
     Wire.begin();
@@ -181,13 +222,21 @@ void setup() {
     // After networkInit: with the radio on, esp_random() is a true RNG.
     bootId = esp_random();
     Serial.printf("boot id %08lx\n", (unsigned long)bootId);
+    uploadQueueInit(STATION_ID);
 
     nextWindowAt = millis() + SAMPLE_WINDOW_MS;
+
+    // The core already runs the task watchdog for its idle tasks; this
+    // lengthens the timeout, makes it reboot, and adds loop() to it.
+    esp_task_wdt_init(WATCHDOG_TIMEOUT_S, true);
+    esp_task_wdt_add(nullptr);
 }
 
 void loop() {
+    esp_task_wdt_reset();
     handleSerial();
     networkPoll();
+    uploadQueuePoll();
 
     uint32_t rainNow = rainTipsTotal();
     if (rainNow != lastRainSeen) {

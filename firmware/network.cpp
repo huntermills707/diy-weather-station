@@ -74,18 +74,23 @@ void networkPoll() {
 
 bool networkConnected() { return WiFi.status() == WL_CONNECTED; }
 
+void networkReset() {
+    // networkPoll() sees the link go down, logs it, and reconnects at once.
+    WiFi.disconnect();
+}
+
 int networkRssi() { return WiFi.RSSI(); }
 
 bool clockSynced() { return synced; }
 
-bool formatUtcNow(char* buf, size_t len) {
+bool formatUtcAt(uint32_t uptimeMs, char* buf, size_t len) {
     if (!synced) {
         buf[0] = '\0';
         return false;
     }
-    time_t now = time(nullptr);
+    time_t at = time(nullptr) - (time_t)((millis() - uptimeMs) / 1000);
     struct tm utc;
-    gmtime_r(&now, &utc);
+    gmtime_r(&at, &utc);
     strftime(buf, len, "%Y-%m-%dT%H:%M:%SZ", &utc);
     return true;
 }

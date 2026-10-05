@@ -208,6 +208,10 @@ h3 {
   font-size: 0.85rem;
 }
 
+.detail.warn {
+  color: var(--warn);
+}
+
 .wind-now {
   display: flex;
   align-items: center;

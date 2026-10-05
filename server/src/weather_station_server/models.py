@@ -6,7 +6,8 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 Identifier = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
 # 500 km/h sits above the firmware ceiling (5 ms wind debounce = 480 km/h): a
-# glitchy gust must not cost the whole reading. Plausibility is M4 work.
+# glitchy gust must not cost the whole reading. Plausibility is flagged after
+# storage instead (quality.py).
 WindKmh = Annotated[float, Field(ge=0, le=500)]
 
 
@@ -30,6 +31,11 @@ class Reading(BaseModel):
     press_hpa: Annotated[float, Field(ge=300, le=1100)] | None
     bme280: Literal["ok", "implausible", "error"]
     rssi_dbm: Annotated[int, Field(ge=-127, le=0)] | None
+    # Reboot and upload-queue telemetry (JAE-60, JAE-62). Optional, so firmware
+    # from before M4 still validates.
+    boot_count: Annotated[int, Field(ge=0)] | None = None
+    reset_reason: Annotated[str, Field(pattern=r"^[a-z_]{1,32}$")] | None = None
+    queue_dropped: Annotated[int, Field(ge=0)] | None = None
 
     @model_validator(mode="after")
     def bme280_values_match_status(self) -> "Reading":

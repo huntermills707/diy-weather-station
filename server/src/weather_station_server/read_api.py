@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.concurrency import run_in_threadpool
 from pydantic import AwareDatetime, BaseModel
 
-from weather_station_server import derived, history
+from weather_station_server import derived, history, quality
 from weather_station_server.db import utc_text
 
 log = logging.getLogger("uvicorn.error")
@@ -57,6 +57,10 @@ class StoredReading(BaseModel):
     press_hpa: float | None
     bme280: Literal["ok", "implausible", "error"]
     rssi_dbm: int | None
+    boot_count: int | None
+    reset_reason: str | None
+    queue_dropped: int | None
+    quality: list[str]
 
 
 class Derived(BaseModel):
@@ -82,6 +86,7 @@ class Health(BaseModel):
     readings_24h: int
     expected_24h: int
     boots_24h: int
+    flagged_24h: int
     clock_synced: bool
     clock_offset_s: float | None
     rssi_dbm: int | None
@@ -101,6 +106,7 @@ class Current(BaseModel):
 class SeriesPoint(BaseModel):
     time: str
     n: int
+    flagged: int
     temp_c: float | None
     temp_min_c: float | None
     temp_max_c: float | None
@@ -132,6 +138,7 @@ class WindRose(BaseModel):
     total: int
     calm: int
     unknown: int
+    flagged: int
     calm_below_kmh: float
     speed_classes_kmh: list[float]
     sectors: list[WindSector]
@@ -176,11 +183,17 @@ async def current(request: Request, station: Station = "station-1") -> Current:
                 None if direction is None else history.SECTOR_LABELS[history.sector_of(direction)]
             ),
         )
+        # A flagged input makes the derived value unavailable, not suspect.
+        flags = " ".join(row["quality"])
+        temp_c, rh_pct, press_hpa = (
+            None if quality.is_flagged(flags, name) else row[name]
+            for name in ("temp_c", "rh_pct", "press_hpa")
+        )
         metrics = Derived(
-            dew_point_c=_round(derived.dew_point_c(row["temp_c"], row["rh_pct"])),
-            heat_index_c=_round(derived.heat_index_c(row["temp_c"], row["rh_pct"])),
+            dew_point_c=_round(derived.dew_point_c(temp_c, rh_pct)),
+            heat_index_c=_round(derived.heat_index_c(temp_c, rh_pct)),
             sea_level_hpa=_round(
-                derived.sea_level_pressure_hpa(row["press_hpa"], row["temp_c"], state.altitude_m)
+                derived.sea_level_pressure_hpa(press_hpa, temp_c, state.altitude_m)
             ),
             altitude_m=state.altitude_m,
         )

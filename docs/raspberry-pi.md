@@ -121,6 +121,7 @@ Installed versions on 2026-10-02:
 | 22 | sshd | |
 | 8000 | weather-station (uvicorn) | Ingest API, LAN only |
 | 3000 | grafana-server | Charts, LAN only |
+| 80 | ntfy | Alert notifications, LAN only (once M4 alerts are installed) |
 | 111 | rpcbind | Comes with the desktop image; unused |
 
 There is no host firewall. The Pi relies on the home router not forwarding
@@ -138,8 +139,8 @@ any ports, which matches ADR 0001's LAN-only scope.
 - **Bootloader EEPROM update pending.** On 2026-10-02, `rpi-eeprom-update`
   reported the installed bootloader from 2025-12-08 and the latest from
   2026-09-25. To apply it, run `sudo rpi-eeprom-update -a` and reboot. Pick a
-  moment when a missed reading doesn't matter: until the upload queue lands
-  in M4, readings sent while the Pi is down are lost.
+  moment when a missed reading doesn't matter. With the M4 firmware the
+  station queues readings while the Pi is down and sends them afterwards.
 
 ## Checks
 

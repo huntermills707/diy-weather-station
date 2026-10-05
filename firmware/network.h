@@ -27,15 +27,20 @@ void networkPoll();
 
 bool networkConnected();
 
+// Drops the WiFi link so networkPoll() reconnects from scratch: recovery for a
+// link that claims to be up but carries nothing (JAE-62).
+void networkReset();
+
 // Signal strength of the current link in dBm; only meaningful when connected.
 int networkRssi();
 
 // True once NTP has set the clock at least once since boot.
 bool clockSynced();
 
-// Writes the current UTC time as "YYYY-MM-DDTHH:MM:SSZ". Returns false (and
-// writes an empty string) when the clock has never been synced.
-bool formatUtcNow(char* buf, size_t len);
+// Writes the UTC time at which millis() read `uptimeMs` (now, or earlier in
+// this boot) as "YYYY-MM-DDTHH:MM:SSZ". Returns false (and writes an empty
+// string) when the clock has never been synced.
+bool formatUtcAt(uint32_t uptimeMs, char* buf, size_t len);
 
 // POSTs a JSON body to INGEST_URL with the bearer token. Returns the HTTP
 // status code, a negative HTTPClient error, or POST_NOT_CONNECTED.

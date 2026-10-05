@@ -271,7 +271,7 @@ def test_series_raw_readings_with_a_gap(client: TestClient, db_path: Path) -> No
     assert points[0]["temp_c"] == 10.0
     gap = points[3]
     assert gap["time"] == "2026-10-01T00:17:39.000Z"
-    assert all(gap[name] is None for name in gap if name not in ("time", "n"))
+    assert all(gap[name] is None for name in gap if name not in ("time", "n", "flagged"))
 
 
 def test_series_aggregates_buckets(client: TestClient, db_path: Path) -> None:

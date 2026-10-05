@@ -5,12 +5,19 @@ every five minutes there is nothing to pool.
 """
 
 import sqlite3
+from collections import deque
 from contextlib import closing
 from datetime import UTC, datetime
 
+from weather_station_server import quality
 from weather_station_server.models import Reading, ReadingReceipt
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# A reading's time: the station's clock, or the server's while the station
+# was unsynced (docs/database.md). Written exactly as in the index below, so
+# SQLite can use the index for it.
+READING_TIME = "COALESCE(device_time, received_at)"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS readings (
@@ -31,6 +38,10 @@ CREATE TABLE IF NOT EXISTS readings (
     press_hpa     REAL,
     bme280        TEXT    NOT NULL,
     rssi_dbm      INTEGER,
+    boot_count    INTEGER,
+    reset_reason  TEXT,
+    queue_dropped INTEGER,
+    quality       TEXT    NOT NULL DEFAULT '',
     UNIQUE (station_id, reading_id)
 );
 CREATE INDEX IF NOT EXISTS readings_station_time ON readings (station_id, received_at);
@@ -39,6 +50,14 @@ CREATE INDEX IF NOT EXISTS readings_station_time ON readings (station_id, receiv
 CREATE INDEX IF NOT EXISTS readings_station_reading_time
     ON readings (station_id, COALESCE(device_time, received_at));
 """
+
+# Version 1 to 2 (M4): reboot and queue telemetry, and data-quality flags.
+MIGRATE_V1 = (
+    "ALTER TABLE readings ADD COLUMN boot_count INTEGER",
+    "ALTER TABLE readings ADD COLUMN reset_reason TEXT",
+    "ALTER TABLE readings ADD COLUMN queue_dropped INTEGER",
+    "ALTER TABLE readings ADD COLUMN quality TEXT NOT NULL DEFAULT ''",
+)
 
 # Payload fields stored as-is, in column order (device_time is converted).
 _COLUMNS = [name for name in Reading.model_fields]
@@ -54,7 +73,10 @@ def connect(path: str) -> sqlite3.Connection:
 
 
 def init_db(path: str) -> None:
-    """Create the file and schema if missing. Safe to run on every startup."""
+    """Create the file and schema if missing, or migrate an older schema.
+
+    Safe to run on every startup.
+    """
     with closing(connect(path)) as conn:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
@@ -65,9 +87,38 @@ def init_db(path: str) -> None:
         # read-only users such as Grafana could not open the database. At one
         # write per five minutes, WAL's concurrency gain doesn't matter.
         conn.execute("PRAGMA journal_mode=DELETE")
+        if version == 1:
+            conn.execute("BEGIN")
+            for statement in MIGRATE_V1:
+                conn.execute(statement)
+            reflag(conn)
+            conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            conn.commit()
         conn.executescript(SCHEMA)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         conn.commit()
+
+
+def reflag(conn: sqlite3.Connection) -> int:
+    """Re-run the quality rules over every stored reading; returns how many are flagged."""
+    conn.row_factory = sqlite3.Row
+    fields = ", ".join(["window_s", "rain_mm", *quality.RANGES])
+    rows = conn.execute(
+        f"SELECT id, station_id, {fields} FROM readings ORDER BY station_id, {READING_TIME}"
+    ).fetchall()
+    conn.row_factory = None
+    updates = []
+    previous: deque[sqlite3.Row] = deque(maxlen=quality.STUCK_READINGS - 1)
+    station = None
+    for row in rows:
+        if row["station_id"] != station:
+            station = row["station_id"]
+            previous.clear()
+        flags = quality.evaluate(row, list(reversed(previous)))
+        updates.append((" ".join(flags), row["id"]))
+        previous.append(row)
+    conn.executemany("UPDATE readings SET quality = ? WHERE id = ?", updates)
+    return sum(1 for text, _ in updates if text)
 
 
 def check_db(path: str) -> None:
@@ -77,19 +128,34 @@ def check_db(path: str) -> None:
 
 
 def store_reading(path: str, reading: Reading) -> ReadingReceipt:
-    """Insert a reading, or return the existing row if it was already stored."""
+    """Insert a reading, or return the existing row if it was already stored.
+
+    The reading is checked against the readings before it in time, so a late
+    (backfilled) reading is judged by its neighbours, not by arrival order.
+    """
     values = reading.model_dump()
     if reading.device_time is not None:
         values["device_time"] = utc_text(reading.device_time)
     received_at = utc_text(datetime.now(UTC))
 
-    columns = ", ".join(["received_at", *_COLUMNS])
-    placeholders = ", ".join("?" * (len(_COLUMNS) + 1))
+    columns = ", ".join(["received_at", "quality", *_COLUMNS])
+    placeholders = ", ".join("?" * (len(_COLUMNS) + 2))
     with closing(connect(path)) as conn, conn:
+        conn.row_factory = sqlite3.Row
+        previous = conn.execute(
+            f"SELECT {', '.join(quality.STUCK_FIELDS)} FROM readings "
+            f"WHERE station_id = ? AND {READING_TIME} < ? ORDER BY {READING_TIME} DESC LIMIT ?",
+            (
+                reading.station_id,
+                values["device_time"] or received_at,
+                quality.STUCK_READINGS - 1,
+            ),
+        ).fetchall()
+        flags = " ".join(quality.evaluate(values, previous))
         cursor = conn.execute(
             f"INSERT INTO readings ({columns}) VALUES ({placeholders}) "
             "ON CONFLICT (station_id, reading_id) DO NOTHING",
-            [received_at, *(values[name] for name in _COLUMNS)],
+            [received_at, flags, *(values[name] for name in _COLUMNS)],
         )
         duplicate = cursor.rowcount == 0
         row_id, received_at = conn.execute(

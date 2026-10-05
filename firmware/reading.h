@@ -21,6 +21,11 @@ struct Reading {
     float pressHpa;
     bool rssiValid;
     int rssiDbm;
+    // Reboot and queue telemetry (JAE-60, JAE-62), fixed when the reading is
+    // taken.
+    uint32_t bootCount;       // boots since flashing, from NVS
+    const char* resetReason;  // why the last boot happened, e.g. "task_watchdog"
+    uint32_t queueDropped;    // readings dropped by queue overflow since boot
 };
 
 // Writes the ingest JSON body for `r`, sent as station `stationId`.

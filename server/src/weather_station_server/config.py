@@ -92,3 +92,39 @@ def load_dashboard_dir(env: Mapping[str, str] | None = None) -> Path:
     env = os.environ if env is None else env
     text = env.get(DASHBOARD_DIR_ENV_VAR, "").strip()
     return Path(text) if text else DEFAULT_DASHBOARD_DIR
+
+
+BACKUP_DIR_ENV_VAR = "WEATHER_STATION_BACKUP_DIR"
+DEFAULT_BACKUP_DIR = "backups"
+NTFY_URL_ENV_VAR = "WEATHER_STATION_NTFY_URL"
+STATION_ENV_VAR = "WEATHER_STATION_STATION_ID"
+DEFAULT_STATION = "station-1"
+ALERT_STATE_ENV_VAR = "WEATHER_STATION_ALERT_STATE"
+
+
+def load_backup_dir(env: Mapping[str, str] | None = None) -> Path:
+    """Return the folder nightly backups go to (docs/database.md, "Backups")."""
+    env = os.environ if env is None else env
+    return Path(env.get(BACKUP_DIR_ENV_VAR, "").strip() or DEFAULT_BACKUP_DIR)
+
+
+def load_ntfy_url(env: Mapping[str, str] | None = None) -> str | None:
+    """Return the ntfy topic URL alerts are posted to, or None to only log them."""
+    env = os.environ if env is None else env
+    url = env.get(NTFY_URL_ENV_VAR, "").strip()
+    if url and not url.startswith(("http://", "https://")):
+        raise ConfigError(f"{NTFY_URL_ENV_VAR}={url!r} must be an http:// or https:// URL")
+    return url or None
+
+
+def load_station(env: Mapping[str, str] | None = None) -> str:
+    """Return the station the alert checker watches."""
+    env = os.environ if env is None else env
+    return env.get(STATION_ENV_VAR, "").strip() or DEFAULT_STATION
+
+
+def load_alert_state_path(env: Mapping[str, str] | None = None) -> Path:
+    """Return the alert checker's state file; defaults to beside the database."""
+    env = os.environ if env is None else env
+    text = env.get(ALERT_STATE_ENV_VAR, "").strip()
+    return Path(text) if text else Path(load_db_path(env)).parent / "alerts.json"

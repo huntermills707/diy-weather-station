@@ -37,9 +37,11 @@ bool readingToJson(const Reading& r, const char* stationId, char* buf, size_t le
                      "\"uptime_ms\":%lu,\"window_s\":%lu,\"rain_tips\":%lu,\"rain_mm\":%.2f,"
                      "\"wind_avg_kmh\":%.1f,\"wind_peak_kmh\":%.1f,\"wind_dir_deg\":%s,"
                      "\"temp_c\":%s,\"rh_pct\":%s,\"press_hpa\":%s,\"bme280\":\"%s\","
-                     "\"rssi_dbm\":%s}",
+                     "\"rssi_dbm\":%s,\"boot_count\":%lu,\"reset_reason\":\"%s\","
+                     "\"queue_dropped\":%lu}",
                      stationId, r.readingId, deviceTime, (unsigned long)r.uptimeMs,
                      (unsigned long)r.windowS, (unsigned long)r.rainTips, r.rainMm, r.windAvgKmh,
-                     r.windPeakKmh, windDir, tempC, rhPct, pressHpa, r.bme280, rssi);
+                     r.windPeakKmh, windDir, tempC, rhPct, pressHpa, r.bme280, rssi,
+                     (unsigned long)r.bootCount, r.resetReason, (unsigned long)r.queueDropped);
     return n > 0 && (size_t)n < len;
 }
