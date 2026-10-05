@@ -10,11 +10,14 @@ Responsibilities:
 - Timestamp readings in UTC via NTP
 - POST readings to the FastAPI ingest service over the LAN every five minutes
   ([docs/ingest-api.md](../docs/ingest-api.md))
-- Queue failed uploads to a bounded backlog and retry oldest-first (M4; for
-  now a failed upload is logged and that reading is dropped)
+- Queue uploads in a bounded backlog (24 hours) and retry oldest-first with
+  bounded backoff ([docs/ingest-api.md](../docs/ingest-api.md#delivery-queueing-and-backfill))
+- Recover from hangs with the task watchdog, and report boot count and reset
+  reason with every reading
 
-`firmware.ino` takes and reports readings, `weather_meters.*` reads the
-rain/wind/vane hardware, `network.*` handles WiFi, NTP and the HTTP POST, and
+`firmware.ino` takes and reports readings and runs the watchdog,
+`weather_meters.*` reads the rain/wind/vane hardware, `network.*` handles
+WiFi, NTP and the HTTP POST, `upload_queue.*` queues and retries uploads, and
 `reading.*` builds the JSON payload.
 
 ## Layout
@@ -97,19 +100,48 @@ table as the fallback for new hardware.
   rain, wind, vane direction, BME280 fields, and RSSI (see docs/sensors.md).
   Invalid sensor states print explicitly (`bme280=error`,
   `wind_dir_deg=unknown`, `time=unsynced`) instead of fabricated values.
-- `upload: id=... ok (201)` after each report, or `FAILED no wifi` /
-  `FAILED code=N` with a running failure count. `200` means the server already
-  had that reading. Negative codes are HTTPClient errors (`-1` connection
-  refused, `-11` read timeout).
+- `upload: id=... ok (201) queued=N` as each reading is delivered, oldest
+  first. `200` means the server already had that reading (a retry after a
+  lost response). `FAILED code=N, retry in S s` keeps the reading queued and
+  backs off 10 s, 20 s, 40 s … up to 5 minutes. Negative codes are
+  HTTPClient errors (`-1` connection refused, `-11` read timeout). Nothing
+  is sent while WiFi is down; readings just queue.
+- `upload: ... REJECTED code=422, dropped`: the server refused the payload
+  as invalid (`400`, `413`, `422`), so retrying can't help.
+- `queue: FULL, dropped oldest id=...` when 288 readings (24 hours) are
+  waiting. The count since boot goes to the server as `queue_dropped`.
+- `upload: 3 sends in a row got no response, resetting wifi`: the link
+  claimed to be up but nothing got through, so it is dropped and rebuilt.
+- `boot #N, reset reason R` at startup. `N` counts boots since flashing (kept
+  in NVS flash); `R` is `power_on`, `external`, `software`, `panic`,
+  `task_watchdog`, `brownout`, and so on. Both go to the server with every
+  reading.
 - `wifi: ...` on every connect attempt, connection (with IP and RSSI), and
   link loss. Retries back off 10 s, 20 s, 40 s … up to 5 minutes; sensors and
   reports keep running throughout. `ntp: started` follows the first
   connection.
 - `event: rain tip #N` prints immediately on each debounced tip; wind closures
   print once per second while the anemometer is turning.
-- Commands: `s` = print a sample report now (resets the window),
-  `c` = toggle the calibration stream (raw vane ADC and heading),
-  `h` = help.
+- Commands: `s` = print a sample report now (resets the window) and queue
+  it, `q` = upload queue status (depth, dropped, rejected, failures, next
+  retry), `c` = toggle the calibration stream (raw vane ADC and heading),
+  `x` = hang on purpose to test the watchdog, `h` = help.
+
+## Watchdog and recovery (JAE-62)
+
+- **Task watchdog:** `loop()` must run at least every 30 s. If it stalls,
+  the ESP32 panics and reboots, and the next readings carry
+  `reset_reason=task_watchdog` and a higher `boot_count`. The slowest normal
+  step, one HTTP POST, is bounded at about 10 s.
+- **Bounded send recovery:** each POST has 5 s connect and read timeouts.
+  Retries back off up to 5 minutes. Three sends in a row with no HTTP
+  response reset WiFi. The station never reboots just because the server is
+  down: a reboot would throw away the queue.
+- **Test it:** send `x` on serial. About 30 s later the board reboots and
+  prints `boot #N, reset reason task_watchdog`; the dashboard's health
+  section shows "Last reboot #N (task watchdog)" in amber.
+- **The queue is in RAM.** A watchdog reset, a reboot, or a power cut loses
+  readings still waiting. The server sees that as a gap.
 - `scripts/serial_capture.py` captures this output with host UTC timestamps.
 
 ## CI and static analysis
