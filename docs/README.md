@@ -9,7 +9,12 @@ Project documentation.
   totals, and derived metrics for the dashboard
 - [Dashboard design](dashboard.md) — layout, timestamps, and how stale or
   unavailable data is shown
-- [Database](database.md) — SQLite schema, timestamps, and retention
+- [Database](database.md) — SQLite schema, timestamps, retention, and
+  nightly backups with the restore procedure
+- [Data quality](data-quality.md) — range and stuck-sensor flags, and how
+  flagged values are treated
+- [Alerts](alerts.md) — offline, freeze, and backup notifications through
+  ntfy on the Pi
 - [Raspberry Pi setup record](raspberry-pi.md) — how the server Pi is built
 - [Sensors, units, and calibration](sensors.md) — report fields and the
   one-time field calibration procedure

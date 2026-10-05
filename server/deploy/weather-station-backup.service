@@ -1,0 +1,33 @@
+# Nightly SQLite backup (JAE-63), started by weather-station-backup.timer.
+# Install steps: deploy/README.md. Restore: docs/database.md.
+[Unit]
+Description=Weather station database backup
+Documentation=https://github.com/huntermills707/diy-weather-station/blob/main/docs/database.md#backups
+
+[Service]
+Type=oneshot
+User=weather-station
+Group=weather-station
+WorkingDirectory=/opt/weather-station/server
+Environment=WEATHER_STATION_DB_PATH=/var/lib/weather-station/weather.db
+Environment=WEATHER_STATION_BACKUP_DIR=/var/backups/weather-station
+ExecStart=/opt/weather-station/server/.venv/bin/python -m weather_station_server.backup
+# Background work: yield to the ingest service.
+Nice=10
+IOSchedulingClass=idle
+
+StateDirectory=weather-station
+ReadWritePaths=/var/backups/weather-station
+UMask=0027
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictRealtime=yes

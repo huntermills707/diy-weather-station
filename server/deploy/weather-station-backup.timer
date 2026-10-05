@@ -1,0 +1,11 @@
+# Runs weather-station-backup.service every night (JAE-63).
+[Unit]
+Description=Nightly weather station database backup
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+# Run at the next boot if the Pi was off at 03:17.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

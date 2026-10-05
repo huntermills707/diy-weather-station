@@ -8,6 +8,11 @@ Responsibilities:
 - Validate payloads and store device + server timestamps in SQLite
 - Expose defined errors and a health endpoint
 - Serve a read API and the local dashboard (`dashboard/`, at `/`)
+- Flag implausible and stuck values ([docs/data-quality.md](../docs/data-quality.md))
+- Back up the database nightly (`python -m weather_station_server.backup`,
+  [docs/database.md](../docs/database.md#backups))
+- Send local alerts through ntfy (`python -m weather_station_server.alerts`,
+  [docs/alerts.md](../docs/alerts.md))
 - Run under systemd as a non-root user with journald logging
 
 The APIs are documented in [docs/ingest-api.md](../docs/ingest-api.md) and
@@ -51,6 +56,14 @@ Optional:
   daily and monthly rain totals; defaults to the host's zone, else UTC.
 - `WEATHER_STATION_DASHBOARD_DIR` — folder served at `/`; defaults to the
   repository's `dashboard/`.
+- `WEATHER_STATION_BACKUP_DIR` — where backups go and where the backup alert
+  looks; defaults to `backups` in the working directory.
+- `WEATHER_STATION_NTFY_URL` — ntfy topic URL for alerts, e.g.
+  `http://localhost/weather`. Unset, alerts only go to the log.
+- `WEATHER_STATION_STATION_ID` — the station the alerts watch; defaults to
+  `station-1`.
+- `WEATHER_STATION_ALERT_STATE` — the alerts' state file; defaults to
+  `alerts.json` beside the database.
 
 For local development, copy `.env.example` to `.env` (gitignored), fill in a
 token, and load it before starting the service:

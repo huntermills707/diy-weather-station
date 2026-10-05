@@ -12,7 +12,9 @@ user.
 | Code and virtualenv | `/opt/weather-station` (git checkout) | admin user, world-readable |
 | Secrets | `/etc/weather-station/env` | root, mode 0600 |
 | Database | `/var/lib/weather-station/weather.db` | `weather-station`, created by systemd |
-| Unit | `/etc/systemd/system/weather-station.service` | root |
+| Backups | `/var/backups/weather-station/` | `weather-station`, mode 0750 |
+| Alert state | `/var/lib/weather-station/alerts.json` | `weather-station` |
+| Units | `/etc/systemd/system/weather-station*.{service,timer}` | root |
 
 The service can read its code but not change it, and it can write only its
 state directory.
@@ -74,8 +76,28 @@ token from step 4. Then re-upload the firmware.
 ```sh
 cd /opt/weather-station && git pull
 cd server && uv sync --locked --no-dev --python /usr/bin/python3
-sudo systemctl restart weather-station
+sudo systemctl restart weather-station weather-station-alerts
 ```
+
+If a unit file in `deploy/` changed, copy it to `/etc/systemd/system/` and run
+`sudo systemctl daemon-reload` before restarting.
+
+### Upgrading to M4 (reliability)
+
+Order matters: **server first, then firmware.** The new firmware sends
+`boot_count`, `reset_reason`, and `queue_dropped`, which an older server
+rejects with `422`, and the station drops a reading the server rejects. The
+new server accepts readings with or without them.
+
+1. Take a backup by hand before the schema migration:
+   `sudo sqlite3 /var/lib/weather-station/weather.db ".backup /var/lib/weather-station/pre-m4.db"`
+2. Update as above. On startup the service migrates the database to schema
+   version 2 and flags existing readings. `journalctl -u weather-station -b`
+   should show a normal startup.
+3. Install the backup timer and alerts (below).
+4. Flash the new firmware ([firmware/README.md](../../firmware/README.md)).
+   The dashboard's health section then shows "Last reboot" and "Upload
+   queue".
 
 ## Check it
 
@@ -101,6 +123,63 @@ sudo reboot                                   # then, after it comes back:
 curl -s <pi-address>:8000/health              # from another machine on the LAN
 journalctl -u weather-station -b              # this boot's logs
 ```
+
+## Backups
+
+Nightly SQLite backups to `/var/backups/weather-station`, keeping 30
+([docs/database.md](../../docs/database.md#backups), which also has the
+restore procedure).
+
+```sh
+sudo install -d -o weather-station -g weather-station -m 0750 /var/backups/weather-station
+sudo cp deploy/weather-station-backup.service deploy/weather-station-backup.timer \
+  /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now weather-station-backup.timer
+sudo systemctl start weather-station-backup     # one now, to check it
+journalctl -u weather-station-backup -n 5       # backup: wrote ... (N readings, ...)
+systemctl list-timers weather-station-backup    # next run 03:17
+```
+
+## Alerts
+
+Notifications for an offline station, freeze risk, and a missing backup
+([docs/alerts.md](../../docs/alerts.md)), delivered by a self-hosted
+[ntfy](https://docs.ntfy.sh) server on the Pi.
+
+```sh
+# 1. ntfy server from ntfy's apt repository
+sudo mkdir -p /etc/apt/keyrings
+sudo curl -L -o /etc/apt/keyrings/ntfy.gpg https://archive.ntfy.sh/apt/keyring.gpg
+echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/ntfy.gpg] https://archive.ntfy.sh/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/ntfy.list
+sudo apt update && sudo apt install -y ntfy
+
+# 2. Tell ntfy its LAN address, then start it (it listens on port 80)
+echo 'base-url: "http://192.168.68.53"' | sudo tee -a /etc/ntfy/server.yml   # your Pi
+sudo systemctl enable --now ntfy
+
+# 3. Point the alerts at a topic, and start them
+echo "WEATHER_STATION_NTFY_URL=http://localhost/weather" | sudo tee -a /etc/weather-station/env
+sudo cp deploy/weather-station-alerts.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now weather-station-alerts
+journalctl -u weather-station-alerts -n 5   # alerts: watching station-1 ...
+```
+
+On the phone, install the ntfy app, add the server `http://<pi-address>`,
+and subscribe to the topic `weather`. Then send a test:
+
+```sh
+sudo sh -c 'set -a; . /etc/weather-station/env; \
+  /opt/weather-station/server/.venv/bin/python -m weather_station_server.alerts --test'
+```
+
+The Android app keeps its own connection to the Pi, so notifications arrive
+while the phone is on the home WiFi. The iOS app wakes up through Apple's
+push service, which a LAN-only server can't use without forwarding to
+ntfy.sh (`upstream-base-url`); without it, iOS shows notifications when the
+app is opened. Like ports 8000 and 3000, port 80 must stay LAN-only.
 
 ## Dashboard
 
