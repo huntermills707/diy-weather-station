@@ -248,14 +248,39 @@ def check_once(s: Settings, states: dict[str, Any], now: datetime) -> dict[str, 
     return states
 
 
-def load_states(path: Path) -> dict[str, Any]:
+def valid_state(state: Any) -> bool:
+    """Whether a saved alert state is one ``step`` can continue from."""
+    if not isinstance(state, dict) or not isinstance(state.get("active"), bool):
+        return False
+    if not isinstance(state.get("announced"), bool):
+        return False
+    if state["announced"] and "last_sent" not in state:
+        return False
     try:
-        return json.loads(path.read_text())
+        for key in ("since", "last_sent", "recovered_at"):
+            if key in state:
+                parse_utc(state[key])
+    except (TypeError, ValueError, AttributeError):
+        return False
+    return True
+
+
+def load_states(path: Path) -> dict[str, Any]:
+    """Saved alert states. A damaged entry is dropped (that alert starts over), not fatal."""
+    try:
+        states = json.loads(path.read_text())
     except FileNotFoundError:
         return {}
     except (OSError, ValueError) as exc:
         log.error("alerts: ignoring unreadable state file %s: %s", path, exc)
         return {}
+    if not isinstance(states, dict):
+        log.error("alerts: ignoring state file %s: not an object", path)
+        return {}
+    for name in [name for name, state in states.items() if not valid_state(state)]:
+        log.error("alerts: ignoring damaged state for %s in %s", name, path)
+        del states[name]
+    return states
 
 
 def save_states(path: Path, states: dict[str, Any]) -> None:
@@ -302,6 +327,9 @@ def main(argv: list[str] | None = None) -> int:
                 states = new
         except (OSError, sqlite3.Error) as exc:
             log.error("alerts: check failed: %s", exc)
+        except Exception:
+            # Last resort: one bad check must not stop alerting for good.
+            log.exception("alerts: check failed unexpectedly")
         if args.once:
             return 0
         time.sleep(CHECK_EVERY_S)

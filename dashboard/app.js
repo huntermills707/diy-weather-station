@@ -222,11 +222,12 @@ function suspectReason(reading, prefix) {
   return flag.endsWith("_stuck") ? "Suspect: unchanged for 2 h" : "Suspect: outside plausible range";
 }
 
-// Shows a suspect warning in place of a card's detail line; returns whether it did.
-function markSuspect(name, reason) {
-  field(`${name}-detail`).classList.toggle("warn", Boolean(reason));
-  if (reason) setText(`${name}-detail`, reason);
-  return Boolean(reason);
+// Shows a suspect warning on a card's detail line: in place of it, or after
+// it with `keep` when the line holds values of its own (the wind's gust).
+function markSuspect(name, reason, keep = false) {
+  const detail = field(`${name}-detail`);
+  detail.classList.toggle("warn", Boolean(reason));
+  if (reason) detail.textContent = keep ? `${detail.textContent} · ${reason}` : reason;
 }
 
 function renderConditions(data) {
@@ -288,7 +289,7 @@ function renderConditions(data) {
   markSuspect("temp", suspectReason(r, "temp_"));
   markSuspect("humidity", suspectReason(r, "rh_"));
   markSuspect("pressure", suspectReason(r, "press_"));
-  markSuspect("wind", suspectReason(r, "wind_") || suspectReason(r, "gust_"));
+  markSuspect("wind", suspectReason(r, "wind_") || suspectReason(r, "gust_"), true);
 
   setRain(data);
 }

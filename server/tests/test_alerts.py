@@ -224,3 +224,27 @@ def test_test_notification(
     monkeypatch.setenv("WEATHER_STATION_NTFY_URL", ntfy.url)
     assert alerts.main(["--test"]) == 0
     assert ntfy.titles() == ["Weather station test"]
+
+
+def test_damaged_state_file_is_dropped_not_fatal(
+    settings: alerts.Settings, ntfy: Ntfy, tmp_path: Path
+) -> None:
+    path = tmp_path / "alerts.json"
+    path.write_text(
+        '{"stale": {"active": true, "announced": true},'
+        ' "freeze": {"active": false, "announced": false, "recovered_at": "garbage"},'
+        ' "backup": {"active": false, "announced": false}}'
+    )
+    states = alerts.load_states(path)
+    assert list(states) == ["backup"]
+
+    fresh_backup(settings, T0)
+    add(settings, T0)
+    run(settings, states, T0 + timedelta(minutes=16))
+    assert ntfy.titles() == ["Weather station offline"]
+
+
+def test_state_file_that_is_not_an_object_is_ignored(tmp_path: Path) -> None:
+    path = tmp_path / "alerts.json"
+    path.write_text("[1, 2]")
+    assert alerts.load_states(path) == {}
