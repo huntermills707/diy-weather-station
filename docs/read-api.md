@@ -6,8 +6,9 @@ endpoints. They are read-only: they open the database read-only and never
 change it.
 
 No authentication, like `GET /health`. The API is reachable only on the LAN
-([ADR 0001](adr/0001-local-architecture.md)). A public read-only dashboard is
-separate, later work (JAE-72).
+([ADR 0001](adr/0001-local-architecture.md)). The same three endpoints are
+also published on the internet, rate limited, by the separate
+[public dashboard](public-dashboard.md) app.
 
 The service also serves interactive docs with the exact response schemas at
 `/docs`.

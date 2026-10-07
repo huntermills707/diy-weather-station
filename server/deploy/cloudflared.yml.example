@@ -1,0 +1,11 @@
+# Cloudflare Tunnel config for the public dashboard (JAE-72). Copy to
+# /etc/cloudflared/weather-station.yml and fill in the tunnel ID and hostname
+# (deploy/README.md, "Public dashboard"). The credentials file is passed on
+# the command line by weather-station-tunnel.service.
+tunnel: <tunnel-id>
+
+ingress:
+  # Only the public read-only app (port 8001), never the ingest service (8000).
+  - hostname: weather.example.com
+    service: http://127.0.0.1:8001
+  - service: http_status:404

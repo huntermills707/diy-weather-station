@@ -8,6 +8,8 @@ Responsibilities:
 - Validate payloads and store device + server timestamps in SQLite
 - Expose defined errors and a health endpoint
 - Serve a read API and the local dashboard (`dashboard/`, at `/`)
+- Serve a separate public, read-only, rate-limited app for the internet
+  (`weather_station_server.public:app`, [docs/public-dashboard.md](../docs/public-dashboard.md))
 - Flag implausible and stuck values ([docs/data-quality.md](../docs/data-quality.md))
 - Back up the database nightly (`python -m weather_station_server.backup`,
   [docs/database.md](../docs/database.md#backups))

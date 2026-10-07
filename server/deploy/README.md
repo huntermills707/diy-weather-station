@@ -15,6 +15,7 @@ user.
 | Backups | `/var/backups/weather-station/` | `weather-station`, mode 0750 |
 | Alert state | `/var/lib/weather-station/alerts.json` | `weather-station` |
 | Units | `/etc/systemd/system/weather-station*.{service,timer}` | root |
+| Tunnel credentials and config | `/etc/cloudflared/weather-station.{json,yml}` | root, mode 0600 (json) |
 
 The service can read its code but not change it, and it can write only its
 state directory.
@@ -76,7 +77,7 @@ token from step 4. Then re-upload the firmware.
 ```sh
 cd /opt/weather-station && git pull
 cd server && uv sync --locked --no-dev --python /usr/bin/python3
-sudo systemctl restart weather-station weather-station-alerts
+sudo systemctl restart weather-station weather-station-alerts weather-station-public
 ```
 
 If a unit file in `deploy/` changed, copy it to `/etc/systemd/system/` and run
@@ -187,6 +188,62 @@ The service serves the dashboard ([docs/dashboard.md](../../docs/dashboard.md))
 from the checkout's `dashboard/` folder. Open `http://<pi-address>:8000/` on
 any device on the LAN. Nothing else to install: `git pull` and a restart
 update it like the rest of the service.
+
+## Public dashboard
+
+A read-only copy of the dashboard on the internet, through a Cloudflare
+Tunnel ([docs/public-dashboard.md](../../docs/public-dashboard.md)). This
+needs a domain on Cloudflare. The steps use `weather.volundarhus.com`; use
+your own hostname.
+
+```sh
+# 1. The public app (127.0.0.1:8001, read-only)
+sudo cp deploy/weather-station-public.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now weather-station-public
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8001/   # 200
+
+# 2. cloudflared from Cloudflare's apt repository
+sudo mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg \
+  | sudo tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main" \
+  | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt update && sudo apt install -y cloudflared
+
+# 3. The tunnel and its DNS record, as your admin user. `login` prints a URL:
+#    open it, sign in to Cloudflare, and pick the domain.
+cloudflared tunnel login
+cloudflared tunnel create weather-station        # prints the tunnel ID
+cloudflared tunnel route dns weather-station weather.volundarhus.com
+
+# 4. Credentials (root-only) and config
+TUNNEL_ID=$(cloudflared tunnel list -o json -n weather-station | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["id"])')
+sudo install -d -m 0755 /etc/cloudflared
+sudo install -m 0600 ~/.cloudflared/$TUNNEL_ID.json /etc/cloudflared/weather-station.json
+sed -e "s/<tunnel-id>/$TUNNEL_ID/" -e "s/weather.example.com/weather.volundarhus.com/" \
+  deploy/cloudflared.yml.example | sudo tee /etc/cloudflared/weather-station.yml
+
+# 5. The tunnel service
+sudo cp deploy/weather-station-tunnel.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now weather-station-tunnel
+journalctl -u weather-station-tunnel -n 20       # "Registered tunnel connection" x4
+```
+
+Then check it from outside the LAN
+([docs/public-dashboard.md](../../docs/public-dashboard.md#checking-it-from-outside)).
+
+`~/.cloudflared/cert.pem` from step 3 can create and delete tunnels and DNS
+records on the account. The running tunnel doesn't need it. Keep it for
+later `route dns` changes, or delete it and run `cloudflared tunnel login`
+again when you need it.
+
+`unattended-upgrades` only installs Debian's updates. Update cloudflared with
+`sudo apt update && sudo apt install --only-upgrade cloudflared`, then
+`sudo systemctl restart weather-station-tunnel`.
+
+To take the dashboard offline, run `sudo systemctl disable --now weather-station-tunnel`.
 
 ## Grafana charts
 

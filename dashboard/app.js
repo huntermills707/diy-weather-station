@@ -778,7 +778,9 @@ function selectRange(range) {
 }
 
 function start() {
-  document.getElementById("grafana-link").href = `${location.protocol}//${location.hostname}:3000/`;
+  // Absent on the public dashboard, which drops the LAN-only links.
+  const grafana = document.getElementById("grafana-link");
+  if (grafana) grafana.href = `${location.protocol}//${location.hostname}:3000/`;
   for (const button of document.querySelectorAll("[data-range]")) {
     button.addEventListener("click", () => selectRange(button.dataset.range));
   }
