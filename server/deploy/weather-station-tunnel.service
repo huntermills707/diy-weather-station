@@ -1,0 +1,34 @@
+# Cloudflare Tunnel publishing the public dashboard (JAE-72).
+# Install steps: deploy/README.md ("Public dashboard").
+[Unit]
+Description=Cloudflare Tunnel for the weather station public dashboard
+Documentation=https://github.com/huntermills707/diy-weather-station/blob/main/docs/public-dashboard.md
+Wants=network-online.target
+After=network-online.target weather-station-public.service
+
+[Service]
+Type=notify
+DynamicUser=yes
+# The tunnel credentials stay root-only on disk; systemd hands this unit a
+# private copy under $CREDENTIALS_DIRECTORY.
+LoadCredential=tunnel.json:/etc/cloudflared/weather-station.json
+ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel \
+    --config /etc/cloudflared/weather-station.yml \
+    run --credentials-file ${CREDENTIALS_DIRECTORY}/tunnel.json
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+LockPersonality=yes
+RestrictRealtime=yes
+
+[Install]
+WantedBy=multi-user.target

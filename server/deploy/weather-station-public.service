@@ -1,0 +1,40 @@
+# Public read-only dashboard (JAE-72), behind the Cloudflare Tunnel.
+# Install steps: deploy/README.md ("Public dashboard").
+[Unit]
+Description=Weather station public read-only dashboard
+Documentation=https://github.com/huntermills707/diy-weather-station/blob/main/docs/public-dashboard.md
+After=network.target weather-station.service
+
+[Service]
+Type=exec
+User=weather-station
+Group=weather-station
+WorkingDirectory=/opt/weather-station/server
+# For the altitude and time zone. The ingest token is in the same file; the
+# public app never needs it, so it is dropped from the environment.
+EnvironmentFile=/etc/weather-station/env
+UnsetEnvironment=WEATHER_STATION_INGEST_TOKEN
+Environment=WEATHER_STATION_DB_PATH=/var/lib/weather-station/weather.db
+# Localhost only: cloudflared is the one client. The app logs each request
+# itself, with the visitor's address, so uvicorn's access log is off.
+ExecStart=/opt/weather-station/server/.venv/bin/uvicorn weather_station_server.public:app \
+    --host 127.0.0.1 --port 8001 --no-access-log --no-server-header
+Restart=always
+RestartSec=5
+
+# Read-only: ProtectSystem=strict and no StateDirectory, so it can read the
+# database but not change it.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+RestrictRealtime=yes
+
+[Install]
+WantedBy=multi-user.target
