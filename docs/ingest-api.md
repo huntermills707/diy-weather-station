@@ -46,9 +46,12 @@ that has no valid number. The station sends `null` and never a fake value.
 | `boot_count` | integer, optional | ≥ 0 | Station boots since flashing, kept in flash. Diagnoses resets |
 | `reset_reason` | string, optional | 1-32 chars, `[a-z_]` | Why the station last booted: `power_on`, `external`, `software`, `panic`, `task_watchdog`, `int_watchdog`, `watchdog`, `brownout`, `deep_sleep`, `unknown` |
 | `queue_dropped` | integer, optional | ≥ 0 | Readings the station dropped since boot because its upload queue was full |
+| `batt_v` | number or null, optional | 0-5 | Battery voltage from the solar charger. `null` = reading out of range (wire off) |
+| `charge_state` | string, optional | `charging`, `full`, `idle`, `unknown` | Solar charger status. `idle` = no solar input |
 
-The three optional fields arrived with M4; firmware from before then omits
-them and they are stored as `NULL`.
+`boot_count`, `reset_reason` and `queue_dropped` arrived with M4, and
+`batt_v` and `charge_state` with JAE-73. Older firmware omits them and they
+are stored as `NULL`.
 
 Unknown fields are rejected, so a typo cannot silently drop data.
 

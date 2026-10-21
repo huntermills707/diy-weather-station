@@ -14,6 +14,7 @@ bool readingToJson(const Reading& r, const char* stationId, char* buf, size_t le
     char rhPct[12] = "null";
     char pressHpa[12] = "null";
     char rssi[8] = "null";
+    char battV[8] = "null";
     if (r.deviceTime[0] != '\0') {
         snprintf(deviceTime, sizeof(deviceTime), "\"%s\"", r.deviceTime);
     }
@@ -31,6 +32,9 @@ bool readingToJson(const Reading& r, const char* stationId, char* buf, size_t le
     if (r.rssiValid) {
         snprintf(rssi, sizeof(rssi), "%d", r.rssiDbm);
     }
+    if (r.battV >= 0.0f) {
+        snprintf(battV, sizeof(battV), "%.2f", r.battV);
+    }
 
     int n = snprintf(buf, len,
                      "{\"station_id\":\"%s\",\"reading_id\":\"%s\",\"device_time\":%s,"
@@ -38,10 +42,11 @@ bool readingToJson(const Reading& r, const char* stationId, char* buf, size_t le
                      "\"wind_avg_kmh\":%.1f,\"wind_peak_kmh\":%.1f,\"wind_dir_deg\":%s,"
                      "\"temp_c\":%s,\"rh_pct\":%s,\"press_hpa\":%s,\"bme280\":\"%s\","
                      "\"rssi_dbm\":%s,\"boot_count\":%lu,\"reset_reason\":\"%s\","
-                     "\"queue_dropped\":%lu}",
+                     "\"queue_dropped\":%lu,\"batt_v\":%s,\"charge_state\":\"%s\"}",
                      stationId, r.readingId, deviceTime, (unsigned long)r.uptimeMs,
                      (unsigned long)r.windowS, (unsigned long)r.rainTips, r.rainMm, r.windAvgKmh,
                      r.windPeakKmh, windDir, tempC, rhPct, pressHpa, r.bme280, rssi,
-                     (unsigned long)r.bootCount, r.resetReason, (unsigned long)r.queueDropped);
+                     (unsigned long)r.bootCount, r.resetReason, (unsigned long)r.queueDropped,
+                     battV, r.chargeState);
     return n > 0 && (size_t)n < len;
 }

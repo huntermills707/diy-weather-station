@@ -69,6 +69,8 @@ The latest reading, with derived metrics, rain totals, and station health.
     "boot_count": 12,
     "reset_reason": "power_on",
     "queue_dropped": 0,
+    "batt_v": 4.07,
+    "charge_state": "charging",
     "quality": []
   },
   "derived": {

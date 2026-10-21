@@ -17,7 +17,8 @@ dropped from the project; neither is read.
 One `report` line every five minutes (or on demand with `s`). The same
 reading is POSTed to the ingest service ([ingest-api.md](ingest-api.md)) with
 the same field names, except that `id`, `time`, and `t` become `reading_id`,
-`device_time`, and `uptime_ms`, and `rain_total` is serial-only. The serial capture
+`device_time`, and `uptime_ms`, `charge` becomes `charge_state`, and
+`rain_total` is serial-only. The serial capture
 script (`scripts/serial_capture.py`) prefixes every line with host UTC time.
 
 | Field | Unit | Sensor | How it is measured |
@@ -35,6 +36,8 @@ script (`scripts/serial_capture.py`) prefixes every line with host UTC time.
 | `rh_pct` | % RH | BME280 | Library read |
 | `press_hpa` | hPa | BME280 | Station pressure (not sea-level corrected) |
 | `bme280` | — | BME280 | `ok`, `implausible` (out-of-range values suppressed), or `error` (no I2C response; retried each report) |
+| `batt_v` | V | Charger V_BAT | 16 calibrated ADC reads × `BATT_DIVIDER_RATIO`; `unknown` outside 2.5-4.5 V (wire off) |
+| `charge` | — | Charger CHRG/DONE | `charging` (CHRG low), `full` (DONE low), `idle` (neither: no solar input, e.g. night), `unknown` (both low, a wiring fault). Sent as `charge_state` |
 | `rssi_dbm` | dBm | WiFi | Signal strength; omitted while WiFi is down |
 
 Invalid states print explicitly rather than as made-up numbers.
@@ -47,6 +50,7 @@ Invalid states print explicitly rather than as made-up numbers.
 | `WIND_KMH_PER_HZ` | 2.4 km/h per closure/s | SEN-08942 datasheet / SparkFun library |
 | `VANE_ADC[16]` | Calibrated on this unit 2026-10-02 (2867, 1381, 1599, …) | Field sweep; SparkFun ESP32 values (3118, 1526, 1761, …) in `SparkFun_Weather_Meter_Kit_Constants.h` are the fallback for new hardware |
 | `VANE_OFFSET_DEG` | 0 | — |
+| `BATT_DIVIDER_RATIO` | 1.47 (4.7k/10k divider) | [Seengreat Solar Energy Manager C wiki](https://seengreat.com/wiki/185/) |
 
 Fixed sampling behaviour (in `weather_meters.cpp`, not expected to change):
 rain debounce 100 ms (bench-measured settle edges at 18-34 ms after a tip),
@@ -73,7 +77,10 @@ This prints `cal vane_adc=<n> dir=<deg>` twice a second. Edit
 2. **Vane orientation.** If the station's "N" mark can't face true north,
    set `VANE_OFFSET_DEG` to the direction the "N" mark actually faces
    (e.g. it faces east → `90`).
-3. **Rain and wind** need no calibration. To sanity-check: pour a known
+3. **Battery.** Measure the cell with a multimeter and compare it with
+   `batt_v` from an `s` report. If they differ by more than ~0.05 V, scale
+   `BATT_DIVIDER_RATIO` by meter ÷ `batt_v`.
+4. **Rain and wind** need no calibration. To sanity-check: pour a known
    volume slowly through the gauge, or compare wind against a handheld
    anemometer, and adjust the constant only if clearly off.
 

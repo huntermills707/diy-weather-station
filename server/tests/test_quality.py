@@ -150,6 +150,29 @@ def test_migration_from_v1_adds_columns_and_flags_old_rows(db_path: Path) -> Non
     assert [r["quality"] for r in rows] == ["", "temp_range", ""]
     assert rows[1]["temp_c"] == 99.0
     assert rows[0]["boot_count"] is None
+    assert rows[0]["batt_v"] is None
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
+
+
+def test_migration_from_v2_adds_charger_columns(db_path: Path) -> None:
+    v2_schema = db.SCHEMA.split("    batt_v")[0] + "    UNIQUE (station_id, reading_id)\n);"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(v2_schema)
+    conn.execute("PRAGMA user_version = 2")
+    conn.execute(
+        "INSERT INTO readings (station_id, reading_id, received_at, uptime_ms, window_s, "
+        "rain_tips, rain_mm, wind_avg_kmh, wind_peak_kmh, bme280, quality) "
+        "VALUES ('station-1', 'old-0', ?, 0, 300, 0, 0, 0, 0, 'error', 'kept')",
+        (utc_text(START),),
+    )
+    conn.commit()
+    conn.close()
+
+    db.init_db(str(db_path))
+
+    [row] = stored_rows(db_path)
+    assert (row["batt_v"], row["charge_state"], row["quality"]) == (None, None, "kept")
     with sqlite3.connect(db_path) as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
 

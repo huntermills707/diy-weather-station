@@ -42,3 +42,9 @@ constexpr int VANE_ADC[16] = {
 // Added to the vane heading, for a station mounted with its "N" mark not
 // facing true north (e.g. N mark faces east -> 90).
 constexpr float VANE_OFFSET_DEG = 0.0f;
+
+// Battery: the charger's V_BAT pin is the cell voltage through a 4.7k/10k
+// divider (Seengreat Solar Energy Manager C wiki), so the cell is the pin
+// voltage x 14.7/10. Field check: compare `batt_v` against a multimeter on
+// the cell and adjust if it is off by more than ~0.05 V.
+constexpr float BATT_DIVIDER_RATIO = 1.47f;

@@ -36,6 +36,8 @@ CREATE TABLE readings (
     reset_reason  TEXT,
     queue_dropped INTEGER,
     quality       TEXT    NOT NULL DEFAULT '',  -- data-quality flags, '' = clean
+    batt_v        REAL,              -- NULL from firmware before JAE-73
+    charge_state  TEXT,              -- charging | full | idle | unknown
     UNIQUE (station_id, reading_id)
 );
 CREATE INDEX readings_station_time ON readings (station_id, received_at);
@@ -76,10 +78,11 @@ Notes on the design:
   No running total or daily summary table is kept. Either would need
   rewriting whenever a late reading arrives (backfill), and the index
   already makes sums over a range cheap.
-- `PRAGMA user_version` records the schema version (currently 2). On
+- `PRAGMA user_version` records the schema version (currently 3). On
   startup the service migrates an older file in one transaction. Version 1
   to 2 (M4) adds `boot_count`, `reset_reason`, `queue_dropped`, and
-  `quality`, then runs the quality rules over every stored reading. Adding an
+  `quality`, then runs the quality rules over every stored reading. Version
+  2 to 3 (JAE-73) adds `batt_v` and `charge_state`. Adding an
   index does not change the version: `CREATE INDEX IF NOT EXISTS` runs on
   every startup, and older code still reads the file. A server older than
   the file refuses to start.

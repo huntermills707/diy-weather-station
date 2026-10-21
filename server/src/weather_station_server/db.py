@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from weather_station_server import quality
 from weather_station_server.models import Reading, ReadingReceipt
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # A reading's time: the station's clock, or the server's while the station
 # was unsynced (docs/database.md). Written exactly as in the index below, so
@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS readings (
     reset_reason  TEXT,
     queue_dropped INTEGER,
     quality       TEXT    NOT NULL DEFAULT '',
+    batt_v        REAL,
+    charge_state  TEXT,
     UNIQUE (station_id, reading_id)
 );
 CREATE INDEX IF NOT EXISTS readings_station_time ON readings (station_id, received_at);
@@ -57,6 +59,12 @@ MIGRATE_V1 = (
     "ALTER TABLE readings ADD COLUMN reset_reason TEXT",
     "ALTER TABLE readings ADD COLUMN queue_dropped INTEGER",
     "ALTER TABLE readings ADD COLUMN quality TEXT NOT NULL DEFAULT ''",
+)
+
+# Version 2 to 3 (JAE-73): solar charger telemetry.
+MIGRATE_V2 = (
+    "ALTER TABLE readings ADD COLUMN batt_v REAL",
+    "ALTER TABLE readings ADD COLUMN charge_state TEXT",
 )
 
 # Payload fields stored as-is, in column order (device_time is converted).
@@ -87,11 +95,14 @@ def init_db(path: str) -> None:
         # read-only users such as Grafana could not open the database. At one
         # write per five minutes, WAL's concurrency gain doesn't matter.
         conn.execute("PRAGMA journal_mode=DELETE")
-        if version == 1:
+        if version in (1, 2):
             conn.execute("BEGIN")
-            for statement in MIGRATE_V1:
+            if version == 1:
+                for statement in MIGRATE_V1:
+                    conn.execute(statement)
+                reflag(conn)
+            for statement in MIGRATE_V2:
                 conn.execute(statement)
-            reflag(conn)
             conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             conn.commit()
         conn.executescript(SCHEMA)

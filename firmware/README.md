@@ -5,7 +5,8 @@ PlatformIO and the Arduino framework.
 
 Responsibilities:
 
-- Read sensors (BME280, rain gauge, anemometer, wind vane)
+- Read sensors (BME280, rain gauge, anemometer, wind vane) and the solar
+  charger's battery voltage and charge state
 - Connect to WiFi with bounded retry/backoff
 - Timestamp readings in UTC via NTP
 - POST readings to the FastAPI ingest service over the LAN every five minutes
@@ -16,7 +17,8 @@ Responsibilities:
   reason with every reading
 
 `firmware.ino` takes and reports readings and runs the watchdog,
-`weather_meters.*` reads the rain/wind/vane hardware, `network.*` handles
+`weather_meters.*` reads the rain/wind/vane hardware, `power.*` reads the
+charger, `network.*` handles
 WiFi, NTP and the HTTP POST, `upload_queue.*` queues and retries uploads, and
 `reading.*` builds the JSON payload.
 
@@ -79,12 +81,23 @@ cp firmware/secrets.example.h firmware/secrets.h
 | Anemometer    | D0 (RJ11)      | 14         | digital, falling-edge interrupt |
 | Wind vane     | A1 (RJ11)      | 35         | 12-bit ADC, 10k pull-up to 3.3V |
 | BME280        | Qwiic I2C      | 21/22      | I2C address 0x77 |
+| Charger V_BAT | A0 (soil SIG)  | 34         | 12-bit ADC, battery through a 4.7k/10k divider on the charger |
+| Charger DONE  | G0 (soil PWR)  | 15         | digital, low = battery full |
+| Charger CHRG  | PWM0 (header)  | 13         | digital, low = charging |
 
 The carrier puts 43k pull-ups and 0.1uF RC filters on the rain and wind-speed
 lines, so firmware uses plain `INPUT` and only a short software debounce
 (rain 100 ms — bench-measured phantom edges arrive 18-34 ms after a real tip;
-wind 5 ms) to reject reed-switch bounce and mechanical settling. The soil
-moisture terminal (A0/G0) is not used: soil moisture is out of scope.
+wind 5 ms) to reject reed-switch bounce and mechanical settling.
+
+The charger is a WatangTech 5V solar charger, a rebrand of the Seengreat
+Solar Energy Manager C (CN3166, [wiki](https://seengreat.com/wiki/185/)).
+Its status header is wired to the soil moisture terminal, unused since soil
+moisture was dropped, and to PWM0. CHRG and DONE are open-drain with 10k
+pull-ups to the charger's 3.3 V output, so firmware uses plain `INPUT`. Leave
+the charger's 5V_EN and 3V3_EN pins unconnected (both default on). Don't
+move a status line to PWM1 (GPIO12): it is a strapping pin, and a line held
+high at boot selects 1.8 V flash and the board won't start.
 
 ## Units and calibration
 
@@ -97,9 +110,10 @@ table as the fallback for new hardware.
 ## Serial output and commands (115200 baud)
 
 - `report ...` every five minutes (ADR 0001 cadence): reading ID, UTC time,
-  rain, wind, vane direction, BME280 fields, and RSSI (see docs/sensors.md).
-  Invalid sensor states print explicitly (`bme280=error`,
-  `wind_dir_deg=unknown`, `time=unsynced`) instead of fabricated values.
+  rain, wind, vane direction, BME280 fields, battery and charge state, and
+  RSSI (see docs/sensors.md). Invalid sensor states print explicitly
+  (`bme280=error`, `wind_dir_deg=unknown`, `batt_v=unknown`,
+  `time=unsynced`) instead of fabricated values.
 - `upload: id=... ok (201) queued=N` as each reading is delivered, oldest
   first. `200` means the server already had that reading (a retry after a
   lost response). `FAILED code=N, retry in S s` keeps the reading queued and

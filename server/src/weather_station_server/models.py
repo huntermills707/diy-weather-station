@@ -36,6 +36,10 @@ class Reading(BaseModel):
     boot_count: Annotated[int, Field(ge=0)] | None = None
     reset_reason: Annotated[str, Field(pattern=r"^[a-z_]{1,32}$")] | None = None
     queue_dropped: Annotated[int, Field(ge=0)] | None = None
+    # Solar charger telemetry (JAE-73). Optional, so older firmware still
+    # validates. The firmware sends null for a battery reading outside 2.5-4.5 V.
+    batt_v: Annotated[float, Field(ge=0, le=5)] | None = None
+    charge_state: Literal["charging", "full", "idle", "unknown"] | None = None
 
     @model_validator(mode="after")
     def bme280_values_match_status(self) -> "Reading":

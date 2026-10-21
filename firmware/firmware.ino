@@ -6,6 +6,7 @@
 #include <esp_task_wdt.h>
 
 #include "network.h"
+#include "power.h"
 #include "reading.h"
 #include "upload_queue.h"
 #include "weather_meters.h"
@@ -130,6 +131,8 @@ static Reading takeReading() {
     r.bootCount = bootCount;
     r.resetReason = resetReason;
     r.queueDropped = uploadQueueDropped();
+    r.battV = batteryVolts();
+    r.chargeState = chargeState();
     return r;
 }
 
@@ -149,7 +152,13 @@ static void printReading(const Reading& r) {
     if (strcmp(r.bme280, "ok") == 0) {
         Serial.printf("temp_c=%.2f rh_pct=%.1f press_hpa=%.1f ", r.tempC, r.rhPct, r.pressHpa);
     }
-    Serial.printf("bme280=%s", r.bme280);
+    Serial.printf("bme280=%s ", r.bme280);
+    if (r.battV >= 0.0f) {
+        Serial.printf("batt_v=%.2f ", r.battV);
+    } else {
+        Serial.print("batt_v=unknown ");
+    }
+    Serial.printf("charge=%s", r.chargeState);
     if (r.rssiValid) {
         Serial.printf(" rssi_dbm=%d", r.rssiDbm);
     }
@@ -217,6 +226,7 @@ void setup() {
     Wire.begin();
     beginBme280();
     weatherMetersInit();
+    powerInit();
 
     networkInit();
     // After networkInit: with the radio on, esp_random() is a true RNG.
