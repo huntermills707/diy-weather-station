@@ -6,6 +6,7 @@ dashboard: no ``POST /readings``, no ``/health``, no ``/docs``, and it never
 loads the ingest token. Every request is rate limited per client and logged.
 """
 
+import hashlib
 import logging
 import math
 import re
@@ -123,8 +124,18 @@ async def guard(request: Request, call_next: Callable[[Request], Awaitable[Respo
 
 
 def public_index() -> str:
-    """The dashboard page without its LAN-only parts."""
-    return LAN_ONLY.sub("", (load_dashboard_dir() / "index.html").read_text())
+    """The dashboard page without its LAN-only parts, with versioned asset links.
+
+    Cloudflare caches app.js and style.css for hours but not the page, so a
+    deploy would otherwise pair a new page with an old script. A content hash
+    in each link (``app.js?v=...``) gives every version its own cache entry.
+    """
+    directory = load_dashboard_dir()
+    page = LAN_ONLY.sub("", (directory / "index.html").read_text())
+    for name in ASSETS:
+        digest = hashlib.sha256((directory / name).read_bytes()).hexdigest()[:12]
+        page = page.replace(f'"{name}"', f'"{name}?v={digest}"')
+    return page
 
 
 @app.get("/", include_in_schema=False)
