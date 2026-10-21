@@ -124,16 +124,17 @@ def check_stale(conn: sqlite3.Connection, s: Settings, now: datetime) -> Conditi
 
 def check_freeze(conn: sqlite3.Connection, s: Settings, now: datetime) -> Condition:
     row = conn.execute(
-        f"SELECT received_at, temp_c, quality FROM readings WHERE station_id = ? "
+        f"SELECT {READING_TIME} AS time, temp_c, quality FROM readings WHERE station_id = ? "
         f"ORDER BY {READING_TIME} DESC LIMIT 1",
         (s.station,),
     ).fetchone()
     # Unknown without a fresh, trustworthy temperature; the offline alert
-    # covers missing data.
+    # covers missing data. Fresh by when it was measured, not received, so a
+    # backfilled reading from an outage can't raise or clear the alert.
     if (
         row is None
         or row["temp_c"] is None
-        or now - parse_utc(row["received_at"]) > STALE_AFTER
+        or now - parse_utc(row["time"]) > STALE_AFTER
         or quality.is_flagged(row["quality"], "temp_c")
     ):
         return Condition(None)
@@ -157,13 +158,14 @@ CHARGE_TEXT = {
 
 def check_battery(conn: sqlite3.Connection, s: Settings, now: datetime) -> Condition:
     row = conn.execute(
-        f"SELECT received_at, batt_v, charge_state FROM readings WHERE station_id = ? "
+        f"SELECT {READING_TIME} AS time, batt_v, charge_state FROM readings WHERE station_id = ? "
         f"ORDER BY {READING_TIME} DESC LIMIT 1",
         (s.station,),
     ).fetchone()
     # Unknown without a fresh battery voltage (firmware before JAE-73, or the
-    # wire off); the offline alert covers missing data.
-    if row is None or row["batt_v"] is None or now - parse_utc(row["received_at"]) > STALE_AFTER:
+    # wire off); the offline alert covers missing data. Fresh by measurement
+    # time, as for the freeze check.
+    if row is None or row["batt_v"] is None or now - parse_utc(row["time"]) > STALE_AFTER:
         return Condition(None)
     volts = row["batt_v"]
     charge = CHARGE_TEXT.get(row["charge_state"])

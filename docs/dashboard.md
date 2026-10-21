@@ -92,7 +92,7 @@ missing.
 | Missing readings in history | The chart line breaks ([gap rule](read-api.md#get-apiseries)). A sensor fault breaks only that sensor's line. |
 | No data in a chart's range | "No data in this period". The rain chart says "No rain in this period". |
 | Wind rose with only calm or unknown readings | A message saying so; the calm and unknown counts are always listed under the rose. |
-| Health warnings | Amber for: stale, fewer than 95 % of expected readings, a reboot, unsynced clock, weak WiFi, flagged readings, a last reboot caused by a watchdog, panic, or brownout, dropped queue readings, and a battery below 3.5 V or not reading. Red for a BME280 error and a battery below 3.3 V. |
+| Health warnings | Amber for: stale, fewer than 95 % of expected readings, a reboot, unsynced clock, weak WiFi, flagged readings, a last reboot caused by a watchdog, panic, or brownout, dropped queue readings, and a battery at or below 3.5 V (the low-battery alert's threshold) or not reading. Red for a BME280 error and a battery below 3.3 V. |
 
 ## Refresh
 

@@ -30,7 +30,8 @@ Without `WEATHER_STATION_NTFY_URL`, alerts go only to the journal.
 | **Station battery low** | The latest reading's battery voltage is at or below **3.5 V**, roughly a tenth of the cell's charge (the charger cuts the load at 3.0 V). The message includes the charge state, e.g. "not charging: no solar input" | It reaches **3.6 V**. The 0.1 V gap keeps load sag and ADC noise from flapping |
 | **Backup missing** | The newest file in the backup folder is more than **26 hours** old, or there are none ([database.md](database.md#backups)) | A new backup is written |
 
-The freeze check only uses a fresh reading (no older than 15 minutes) with a
+The freeze check only uses a fresh reading (measured no more than 15 minutes
+ago, so readings the station backfills after an outage don't count) with a
 temperature that is present and not flagged ([data-quality.md](data-quality.md)).
 Otherwise it leaves the alert as it is: the offline alert already covers
 missing data. The battery check works the same way: it needs a fresh reading

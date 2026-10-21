@@ -118,7 +118,8 @@ function batteryPercent(volts) {
 
 function batteryRow(r) {
   if (r.batt_v == null) return ["Battery", "Not reading (check the V_BAT wire)", "warn"];
-  const cls = r.batt_v < BATTERY_CRITICAL_V ? "bad" : r.batt_v < BATTERY_LOW_V ? "warn" : "";
+  // Amber from the low-battery alert's threshold (alerts.py) down.
+  const cls = r.batt_v < BATTERY_CRITICAL_V ? "bad" : r.batt_v <= BATTERY_LOW_V ? "warn" : "";
   const note =
     r.charge_state === "charging"
       ? "reads high while charging"
@@ -404,11 +405,11 @@ function renderHealth(data) {
       r.queue_dropped ? "warn" : "",
     ]);
   }
-  // Charger telemetry: absent from firmware before JAE-73.
-  if (r.charge_state != null) {
-    items.push(batteryRow(r));
-    items.push(["Solar charging", CHARGE_TEXT[r.charge_state], ""]);
-  }
+  // Charger telemetry: absent from firmware before JAE-73. JAE-73 firmware
+  // always sends charge_state, so a null batt_v next to it means the V_BAT
+  // wire is off, and the battery row says so.
+  if (r.batt_v != null || r.charge_state != null) items.push(batteryRow(r));
+  if (r.charge_state != null) items.push(["Solar charging", CHARGE_TEXT[r.charge_state], ""]);
   items.push(["Last reading ID", r.reading_id, ""]);
   const list = document.getElementById("health");
   list.replaceChildren(

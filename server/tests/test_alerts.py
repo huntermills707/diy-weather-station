@@ -72,11 +72,8 @@ def settings(db_path: Path, tmp_path: Path, ntfy: Ntfy) -> alerts.Settings:
 
 def add(settings: alerts.Settings, at: datetime, temp_c: float = 10.0, **kw: Any) -> None:
     """Store a reading received at ``at`` (the server clock is patched for it)."""
-    reading = Reading(
-        **make_reading(
-            reading_id=f"x-{at.timestamp():.0f}", device_time=utc_text(at), temp_c=temp_c, **kw
-        )
-    )
+    fields = {"reading_id": f"x-{at.timestamp():.0f}", "device_time": utc_text(at), **kw}
+    reading = Reading(**make_reading(temp_c=temp_c, **fields))
 
     class Frozen(datetime):
         @classmethod
@@ -204,6 +201,19 @@ def test_battery_ignores_missing_and_old_voltages(settings: alerts.Settings, ntf
     states = run(settings, {}, T0 + timedelta(minutes=40))  # stale: offline alert only
     assert ntfy.titles() == ["Weather station offline"]
     assert not states["battery"]["active"]
+
+
+def test_backfilled_readings_are_judged_by_measurement_time(
+    settings: alerts.Settings, ntfy: Ntfy
+) -> None:
+    """After an outage the station sends its queue oldest first: an hour-old
+    low battery or frost arriving now must not raise an alert."""
+    fresh_backup(settings, T0 + timedelta(hours=2))
+    now = T0 + timedelta(hours=1)
+    add(settings, now, device_time=utc_text(T0), batt_v=3.3, temp_c=0.0)
+    states = run(settings, {}, now + timedelta(seconds=30))
+    assert ntfy.titles() == []
+    assert not states["battery"]["active"] and not states["freeze"]["active"]
 
 
 def test_missing_backup_alerts(settings: alerts.Settings, ntfy: Ntfy) -> None:
