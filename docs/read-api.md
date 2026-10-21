@@ -196,7 +196,8 @@ Readings over a range, downsampled on the server.
       "press_hpa": 1007.0,
       "wind_avg_kmh": 0.0,
       "wind_peak_kmh": 0.0,
-      "rain_mm": 0.0
+      "rain_mm": 0.0,
+      "batt_v": 3.85
     }
   ]
 }
@@ -220,7 +221,8 @@ point has:
 - `n`: how many readings it holds
 - the averages of `temp_c`, `rh_pct`, `press_hpa`, and `wind_avg_kmh`; the
   lowest and highest temperature (`temp_min_c`, `temp_max_c`); the highest
-  gust (`wind_peak_kmh`); and the total `rain_mm`
+  gust (`wind_peak_kmh`); the total `rain_mm`; and the average battery
+  voltage `batt_v` (`null` before JAE-73 firmware)
 
 Missing sensor values are left out of the averages, and so are
 [flagged](data-quality.md) ones. If a bucket has no valid value for a field,

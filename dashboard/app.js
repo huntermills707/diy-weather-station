@@ -24,6 +24,20 @@ const UNIT_SYSTEMS = {
   },
 };
 const SVG_NS = "http://www.w3.org/2000/svg";
+// Rough resting charge of a 1S Li-ion cell by voltage. Only a guide: the
+// voltage reads high while charging and sags under load.
+const BATTERY_PCT = [
+  [3.0, 0], [3.3, 5], [3.5, 10], [3.6, 20], [3.7, 35],
+  [3.8, 55], [3.9, 70], [4.0, 80], [4.1, 90], [4.2, 100],
+];
+const BATTERY_LOW_V = 3.5;
+const BATTERY_CRITICAL_V = 3.3;
+const CHARGE_TEXT = {
+  charging: "Charging",
+  full: "Full",
+  idle: "Not charging (no solar input)",
+  unknown: "Unknown",
+};
 
 function savedUnits() {
   try {
@@ -88,6 +102,28 @@ function el(tag, attrs = {}, text) {
   }
   if (text != null) node.textContent = text;
   return node;
+}
+
+function batteryPercent(volts) {
+  if (volts <= BATTERY_PCT[0][0]) return 0;
+  for (let i = 1; i < BATTERY_PCT.length; i++) {
+    const [v1, p1] = BATTERY_PCT[i];
+    if (volts <= v1) {
+      const [v0, p0] = BATTERY_PCT[i - 1];
+      return p0 + ((volts - v0) / (v1 - v0)) * (p1 - p0);
+    }
+  }
+  return 100;
+}
+
+function batteryRow(r) {
+  if (r.batt_v == null) return ["Battery", "Not reading (check the V_BAT wire)", "warn"];
+  const cls = r.batt_v < BATTERY_CRITICAL_V ? "bad" : r.batt_v < BATTERY_LOW_V ? "warn" : "";
+  const note =
+    r.charge_state === "charging"
+      ? "reads high while charging"
+      : `about ${Math.round(batteryPercent(r.batt_v) / 5) * 5}%`;
+  return ["Battery", `${r.batt_v.toFixed(2)} V (${note})`, cls];
 }
 
 function plural(n, word) {
@@ -368,6 +404,11 @@ function renderHealth(data) {
       r.queue_dropped ? "warn" : "",
     ]);
   }
+  // Charger telemetry: absent from firmware before JAE-73.
+  if (r.charge_state != null) {
+    items.push(batteryRow(r));
+    items.push(["Solar charging", CHARGE_TEXT[r.charge_state], ""]);
+  }
   items.push(["Last reading ID", r.reading_id, ""]);
   const list = document.getElementById("health");
   list.replaceChildren(
@@ -418,6 +459,11 @@ const CHARTS = {
     unit: "mm",
     digits: 2,
     fromZero: true,
+  },
+  battery: {
+    lines: [{ key: "batt_v", color: "var(--battery)", label: "Battery" }],
+    unit: "V",
+    digits: 2,
   },
 };
 

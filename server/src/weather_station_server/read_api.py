@@ -117,6 +117,7 @@ class SeriesPoint(BaseModel):
     wind_avg_kmh: float | None
     wind_peak_kmh: float | None
     rain_mm: float | None
+    batt_v: float | None
 
 
 class Series(BaseModel):
