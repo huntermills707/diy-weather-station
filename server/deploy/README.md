@@ -157,7 +157,7 @@ echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/ntfy.gpg] https://archive.ntfy
 sudo apt update && sudo apt install -y ntfy
 
 # 2. Tell ntfy its LAN address, then start it (it listens on port 80)
-echo 'base-url: "http://192.168.68.53"' | sudo tee -a /etc/ntfy/server.yml   # your Pi
+echo 'base-url: "http://192.168.68.52"' | sudo tee -a /etc/ntfy/server.yml   # your Pi
 sudo systemctl enable --now ntfy
 
 # 3. Point the alerts at a topic, and start them
