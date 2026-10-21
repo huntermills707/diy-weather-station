@@ -19,6 +19,6 @@ void powerInit();
 // range (e.g. the V_BAT wire is off).
 float batteryVolts();
 
-// "charging" (CHRG low), "full" (DONE low), "idle" (neither: no solar input),
-// or "unknown" (both low, which the charger never does on its own).
+// "charging" (only CHRG low), "full" (only DONE low), or "idle" (anything
+// else: no solar input, or input too weak to charge).
 const char* chargeState();

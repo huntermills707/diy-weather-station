@@ -37,7 +37,7 @@ script (`scripts/serial_capture.py`) prefixes every line with host UTC time.
 | `press_hpa` | hPa | BME280 | Station pressure (not sea-level corrected) |
 | `bme280` | — | BME280 | `ok`, `implausible` (out-of-range values suppressed), or `error` (no I2C response; retried each report) |
 | `batt_v` | V | Charger V_BAT | 16 calibrated ADC reads × `BATT_DIVIDER_RATIO`; `unknown` outside 2.5-4.5 V (wire off) |
-| `charge` | — | Charger CHRG/DONE | `charging` (CHRG low), `full` (DONE low), `idle` (neither: no solar input, e.g. night), `unknown` (both low, a wiring fault). Sent as `charge_state` |
+| `charge` | — | Charger CHRG/DONE | `charging` (only CHRG low), `full` (only DONE low), or `idle` (no solar input, e.g. night: the charger powers its status pull-ups from the panel, so both lines read low). Sent as `charge_state` |
 | `rssi_dbm` | dBm | WiFi | Signal strength; omitted while WiFi is down |
 
 Invalid states print explicitly rather than as made-up numbers.

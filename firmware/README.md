@@ -94,7 +94,9 @@ The charger is a WatangTech 5V solar charger, a rebrand of the Seengreat
 Solar Energy Manager C (CN3166, [wiki](https://seengreat.com/wiki/185/)).
 Its status header is wired to the soil moisture terminal, unused since soil
 moisture was dropped, and to PWM0. CHRG and DONE are open-drain with 10k
-pull-ups to the charger's 3.3 V output, so firmware uses plain `INPUT`. Leave
+pull-ups on the charger, so firmware uses plain `INPUT`. Those pull-ups are
+powered from the solar input: with no input (night, or a panel indoors)
+both lines read low, which firmware reports as `idle`. Leave
 the charger's 5V_EN and 3V3_EN pins unconnected (both default on). Don't
 move a status line to PWM1 (GPIO12): it is a strapping pin, and a line held
 high at boot selects 1.8 V flash and the board won't start.

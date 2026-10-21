@@ -8,8 +8,9 @@ constexpr float BATT_MAX_V = 4.5f;
 constexpr int BATT_SAMPLES = 16;
 
 void powerInit() {
-    // CHRG and DONE are open-drain on the charger with 10k pull-ups to its
-    // 3.3 V output, so no internal pull-ups here.
+    // CHRG and DONE are open-drain with 10k pull-ups on the charger. The
+    // pull-ups' 3.3 V comes from the solar input, so with no input both
+    // lines sit low (bench, 2026-10-21).
     pinMode(PIN_CHG_CHRG, INPUT);
     pinMode(PIN_CHG_DONE, INPUT);
     pinMode(PIN_BATT, INPUT);
@@ -28,13 +29,12 @@ float batteryVolts() {
 }
 
 const char* chargeState() {
-    bool charging = digitalRead(PIN_CHG_CHRG) == LOW;
-    bool full = digitalRead(PIN_CHG_DONE) == LOW;
-    if (charging && full) {
-        return "unknown";
+    // The charger never pulls both low itself: both low means the pull-ups
+    // are unpowered, i.e. no solar input.
+    bool chrgLow = digitalRead(PIN_CHG_CHRG) == LOW;
+    bool doneLow = digitalRead(PIN_CHG_DONE) == LOW;
+    if (chrgLow != doneLow) {
+        return chrgLow ? "charging" : "full";
     }
-    if (charging) {
-        return "charging";
-    }
-    return full ? "full" : "idle";
+    return "idle";
 }

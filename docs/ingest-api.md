@@ -47,7 +47,7 @@ that has no valid number. The station sends `null` and never a fake value.
 | `reset_reason` | string, optional | 1-32 chars, `[a-z_]` | Why the station last booted: `power_on`, `external`, `software`, `panic`, `task_watchdog`, `int_watchdog`, `watchdog`, `brownout`, `deep_sleep`, `unknown` |
 | `queue_dropped` | integer, optional | ≥ 0 | Readings the station dropped since boot because its upload queue was full |
 | `batt_v` | number or null, optional | 0-5 | Battery voltage from the solar charger. `null` = reading out of range (wire off) |
-| `charge_state` | string, optional | `charging`, `full`, `idle`, `unknown` | Solar charger status. `idle` = no solar input |
+| `charge_state` | string, optional | `charging`, `full`, `idle`, `unknown` | Solar charger status. `idle` = no solar input. Current firmware never sends `unknown`; early JAE-73 bench firmware did |
 
 `boot_count`, `reset_reason` and `queue_dropped` arrived with M4, and
 `batt_v` and `charge_state` with JAE-73. Older firmware omits them and they
