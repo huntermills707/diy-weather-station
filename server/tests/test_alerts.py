@@ -179,6 +179,33 @@ def test_freeze_ignores_flagged_and_old_temperatures(settings: alerts.Settings, 
     assert ntfy.messages == []
 
 
+def test_battery_alert_with_hysteresis(settings: alerts.Settings, ntfy: Ntfy) -> None:
+    fresh_backup(settings, T0 + timedelta(hours=1))
+    states: dict = {}
+    volts = [3.8, 3.48, 3.55, 3.45, 3.58, 3.62, 3.55]
+    for i, v in enumerate(volts):
+        at = T0 + timedelta(minutes=5 * i)
+        charge = "charging" if i >= 5 else "idle"
+        add(settings, at, batt_v=v, charge_state=charge)
+        states = run(settings, states, at + timedelta(seconds=30))
+    assert ntfy.titles() == ["Station battery low", "Station battery recovered"]
+    assert ntfy.messages[0]["body"] == (
+        "Battery low: 3.48 V at station-1 (not charging: no solar input)."
+    )
+    assert ntfy.messages[1]["body"] == "Battery recovered: 3.62 V at station-1 (charging)."
+
+
+def test_battery_ignores_missing_and_old_voltages(settings: alerts.Settings, ntfy: Ntfy) -> None:
+    fresh_backup(settings, T0 + timedelta(hours=1))
+    add(settings, T0, batt_v=3.2)
+    add(settings, T0 + timedelta(minutes=5))  # firmware without batt_v
+    run(settings, {}, T0 + timedelta(minutes=6))
+    add(settings, T0 + timedelta(minutes=10), batt_v=3.2)
+    states = run(settings, {}, T0 + timedelta(minutes=40))  # stale: offline alert only
+    assert ntfy.titles() == ["Weather station offline"]
+    assert not states["battery"]["active"]
+
+
 def test_missing_backup_alerts(settings: alerts.Settings, ntfy: Ntfy) -> None:
     fresh_backup(settings, T0 - timedelta(hours=27))
     states = run(settings, {}, T0)

@@ -1,9 +1,9 @@
 """Local station alerts (docs/alerts.md, JAE-65).
 
 A small daemon, separate from the ingest service so it still notices when
-that service is down. Once a minute it reads the database and checks three
-conditions: no new readings (station offline), freezing temperature, and no
-recent backup. Each alert is announced once when it starts, reminded every
+that service is down. Once a minute it reads the database and checks four
+conditions: no new readings (station offline), freezing temperature, low
+station battery, and no recent backup. Each alert is announced once when it starts, reminded every
 REMIND_EVERY while it lasts, and announced again when it clears. Alerts go to
 the journal and, when ``WEATHER_STATION_NTFY_URL`` is set, to ntfy.
 
@@ -49,6 +49,11 @@ STALE_AFTER = timedelta(minutes=15)
 # threshold does not flap.
 FREEZE_AT_C = 2.0
 FREEZE_CLEAR_C = 3.0
+# A 1S Li-ion cell at 3.5 V has roughly a tenth of its charge left, and the
+# charger cuts the load at 3.0 V. It clears 0.1 V higher so load sag and
+# ADC noise near the threshold do not flap.
+BATTERY_LOW_V = 3.5
+BATTERY_CLEAR_V = 3.6
 # Nightly backups, with two hours of slack.
 BACKUP_MAX_AGE = timedelta(hours=26)
 REMIND_EVERY = timedelta(hours=6)
@@ -59,6 +64,7 @@ QUIET_AFTER_RECOVERY = timedelta(hours=1)
 TITLES = {
     "stale": ("Weather station offline", "Weather station back online"),
     "freeze": ("Freeze risk", "Freeze risk over"),
+    "battery": ("Station battery low", "Station battery recovered"),
     "backup": ("Weather database backup missing", "Weather database backups current"),
 }
 
@@ -142,6 +148,35 @@ def check_freeze(conn: sqlite3.Connection, s: Settings, now: datetime) -> Condit
     return Condition(active, f"Freeze risk: {reading}.", f"Above freezing again: {reading}.")
 
 
+CHARGE_TEXT = {
+    "charging": "charging",
+    "full": "full",
+    "idle": "not charging: no solar input",
+}
+
+
+def check_battery(conn: sqlite3.Connection, s: Settings, now: datetime) -> Condition:
+    row = conn.execute(
+        f"SELECT received_at, batt_v, charge_state FROM readings WHERE station_id = ? "
+        f"ORDER BY {READING_TIME} DESC LIMIT 1",
+        (s.station,),
+    ).fetchone()
+    # Unknown without a fresh battery voltage (firmware before JAE-73, or the
+    # wire off); the offline alert covers missing data.
+    if row is None or row["batt_v"] is None or now - parse_utc(row["received_at"]) > STALE_AFTER:
+        return Condition(None)
+    volts = row["batt_v"]
+    charge = CHARGE_TEXT.get(row["charge_state"])
+    reading = f"{volts:.2f} V at {s.station}" + (f" ({charge})" if charge else "")
+    if volts <= BATTERY_LOW_V:
+        active = True
+    elif volts >= BATTERY_CLEAR_V:
+        active = False
+    else:
+        active = None
+    return Condition(active, f"Battery low: {reading}.", f"Battery recovered: {reading}.")
+
+
 def check_backup(s: Settings, now: datetime) -> Condition:
     newest = backup.latest_backup(s.backup_dir) if s.backup_dir.is_dir() else None
     if newest is None:
@@ -160,6 +195,7 @@ def check_all(s: Settings, now: datetime) -> dict[str, Condition]:
         return {
             "stale": check_stale(conn, s, now),
             "freeze": check_freeze(conn, s, now),
+            "battery": check_battery(conn, s, now),
             "backup": check_backup(s, now),
         }
 
@@ -204,6 +240,8 @@ def notify(url: str | None, title: str, message: str, kind: str, name: str) -> N
         if kind == "recovered"
         else "snowflake"
         if name == "freeze"
+        else "battery"
+        if name == "battery"
         else "warning"
     )
     request = urllib.request.Request(
