@@ -17,8 +17,8 @@ deliberately left out.
 | OS | Raspberry Pi OS (64-bit) with desktop and recommended software (pi-gen stage4), image 2026-09-15, based on Debian 13 trixie, kernel 6.18 (`rpt-rpi-2712`) |
 | Hostname | `weatherhub` |
 | Admin user | `weather` (uid 1000, in `sudo`; sudo asks for the password) |
-| Network | WiFi (`wlan0`, NetworkManager via netplan); Ethernet unused |
-| Address | 192.168.68.53/22, a DHCP reservation in the home router |
+| Network | Ethernet (`eth0`, NetworkManager via netplan) to a switch in the mini rack. WiFi (`wlan0`) is configured but off (`autoconnect no`): with both up on one subnet, replies left by the wrong interface and station uploads timed out (2026-10-21) |
+| Address | 192.168.68.52/22, a DHCP reservation in the home router for the Ethernet MAC (until 2026-10-21: 192.168.68.53 on WiFi) |
 | Time | `systemd-timesyncd` (Debian NTP pool), time zone America/Los_Angeles |
 | Locale | `en_GB.UTF-8` (Raspberry Pi OS default), US keyboard layout |
 | SSH | Port 22. Key login for `weather`; password login also allowed (see below) |
@@ -54,10 +54,13 @@ it on a rebuild. Then:
 
 ```sh
 # SSH key login from the dev laptop (run on the laptop)
-ssh-copy-id -i ~/.ssh/id_ed25519.pub weather@192.168.68.53
+ssh-copy-id -i ~/.ssh/id_ed25519.pub weather@192.168.68.52
 
-# Fixed address: reserve 192.168.68.53 for the Pi's WiFi MAC
-# (2c:cf:67:c1:1c:59) in the router's DHCP settings.
+# Fixed address: reserve 192.168.68.52 for the Pi's Ethernet MAC
+# (2c:cf:67:c1:1c:56) in the router's DHCP settings, and keep WiFi off so
+# the Pi has one address on the LAN (two on one subnet break replies):
+sudo nmcli con mod netplan-wlan0-FreeBitcoin connection.autoconnect no
+sudo nmcli con down netplan-wlan0-FreeBitcoin
 
 # Automatic security updates
 sudo apt install -y unattended-upgrades apt-listchanges
