@@ -50,7 +50,7 @@ Invalid states print explicitly rather than as made-up numbers.
 | `WIND_KMH_PER_HZ` | 2.4 km/h per closure/s | SEN-08942 datasheet / SparkFun library |
 | `VANE_ADC[16]` | Calibrated on this unit 2026-10-02 (2867, 1381, 1599, …) | Field sweep; SparkFun ESP32 values (3118, 1526, 1761, …) in `SparkFun_Weather_Meter_Kit_Constants.h` are the fallback for new hardware |
 | `VANE_OFFSET_DEG` | 0 | — |
-| `BATT_DIVIDER_RATIO` | 1.47 (4.7k/10k divider) | [Seengreat Solar Energy Manager C wiki](https://seengreat.com/wiki/185/) |
+| `BATT_DIVIDER_RATIO` | 1.52, calibrated on this unit 2026-10-21 (charger holding 4.2 V read 4.06 V with 1.47) | 1.47 nominal for the 4.7k/10k divider, [Seengreat Solar Energy Manager C wiki](https://seengreat.com/wiki/185/) |
 
 Fixed sampling behaviour (in `weather_meters.cpp`, not expected to change):
 rain debounce 100 ms (bench-measured settle edges at 18-34 ms after a tip),

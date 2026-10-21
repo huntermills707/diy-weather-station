@@ -44,7 +44,9 @@ constexpr int VANE_ADC[16] = {
 constexpr float VANE_OFFSET_DEG = 0.0f;
 
 // Battery: the charger's V_BAT pin is the cell voltage through a 4.7k/10k
-// divider (Seengreat Solar Energy Manager C wiki), so the cell is the pin
-// voltage x 14.7/10. Field check: compare `batt_v` against a multimeter on
-// the cell and adjust if it is off by more than ~0.05 V.
-constexpr float BATT_DIVIDER_RATIO = 1.47f;
+// divider (Seengreat Solar Energy Manager C wiki), nominally pin x 1.47. The
+// ESP32 ADC reads low near the top of its range, so this is calibrated on
+// this unit (2026-10-21): during the charger's constant-voltage stage, with
+// the cell held at 4.2 V, 1.47 read 4.06 V. Field check: compare `batt_v`
+// against a multimeter on the cell and adjust if off by more than ~0.05 V.
+constexpr float BATT_DIVIDER_RATIO = 1.52f;
