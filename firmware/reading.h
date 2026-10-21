@@ -26,6 +26,9 @@ struct Reading {
     uint32_t bootCount;       // boots since flashing, from NVS
     const char* resetReason;  // why the last boot happened, e.g. "task_watchdog"
     uint32_t queueDropped;    // readings dropped by queue overflow since boot
+    // Charger telemetry (JAE-73).
+    float battV;              // < 0 when out of range
+    const char* chargeState;  // "charging", "full", "idle", or "unknown"
 };
 
 // Writes the ingest JSON body for `r`, sent as station `stationId`.

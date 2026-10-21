@@ -24,7 +24,7 @@ It serves:
 | Path | What |
 | ---- | ---- |
 | `GET /`, `/index.html` | The dashboard page, without its LAN-only footer links (API docs, Grafana) |
-| `GET /app.js`, `/style.css` | The page's script and styles |
+| `GET /app.js`, `/style.css` | The page's script and styles. The page links them as `app.js?v=<hash>`, a hash of the file's contents: Cloudflare caches scripts and styles for hours but not the page, so without it a deploy would pair the new page with the old script |
 | `GET /api/current`, `/api/series`, `/api/wind` | The [read API](read-api.md), unchanged |
 
 Everything else is closed:

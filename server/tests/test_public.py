@@ -1,4 +1,5 @@
 import logging
+import re
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -30,6 +31,15 @@ def test_serves_dashboard_without_lan_links(public_client: TestClient) -> None:
         assert "grafana" not in response.text.lower()
     assert public_client.get("/app.js").status_code == 200
     assert public_client.get("/style.css").status_code == 200
+
+
+def test_asset_links_carry_a_content_hash(public_client: TestClient) -> None:
+    """A deploy changes the links, so a CDN can't serve an old script with a new page."""
+    page = public_client.get("/").text
+    for name in ("app.js", "style.css"):
+        link = re.search(rf'"{re.escape(name)}\?v=([0-9a-f]{{12}})"', page)
+        assert link, name
+        assert public_client.get(f"/{name}?v={link[1]}").status_code == 200
 
 
 def test_serves_read_api(public_client: TestClient) -> None:

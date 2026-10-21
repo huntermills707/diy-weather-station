@@ -146,8 +146,9 @@ def series(
                    avg(wind_avg_kmh) AS wind_avg_kmh,
                    max(wind_peak_kmh) AS wind_peak_kmh,
                    sum(rain_mm) AS rain_mm,
+                   avg(batt_v) AS batt_v,
                    sum(quality != '') AS flagged
-            FROM (SELECT {READING_TIME} AS time, quality, {usable}
+            FROM (SELECT {READING_TIME} AS time, quality, batt_v, {usable}
                   FROM readings WHERE station_id = :station)
             WHERE time >= :start AND time < :end
             GROUP BY bucket ORDER BY bucket
@@ -181,8 +182,8 @@ def _epoch_text(epoch: float) -> str:
 
 def _gap(epoch: float) -> dict[str, Any]:
     names = (
-        "temp_c temp_min_c temp_max_c rh_pct press_hpa wind_avg_kmh wind_peak_kmh rain_mm".split()
-    )
+        "temp_c temp_min_c temp_max_c rh_pct press_hpa wind_avg_kmh wind_peak_kmh rain_mm batt_v"
+    ).split()
     return {"time": _epoch_text(epoch), "n": 0, "flagged": 0, **dict.fromkeys(names)}
 
 

@@ -89,6 +89,31 @@ def test_telemetry_fields_are_optional(client: TestClient, auth: dict, db_path: 
     assert stored_rows(db_path)[0]["boot_count"] is None
 
 
+def test_charger_fields_are_stored_and_shown(client: TestClient, auth: dict, db_path: Path) -> None:
+    now = datetime.now(UTC)
+    reading = make_reading(device_time=utc_text(now), batt_v=3.97, charge_state="charging")
+    assert client.post("/readings", json=reading, headers=auth).status_code == 201
+    [row] = stored_rows(db_path)
+    assert (row["batt_v"], row["charge_state"]) == (3.97, "charging")
+    body = client.get("/api/current").json()["reading"]
+    assert (body["batt_v"], body["charge_state"]) == (3.97, "charging")
+
+
+def test_charger_fields_are_optional(client: TestClient, auth: dict, db_path: Path) -> None:
+    """Firmware from before JAE-73 sends neither; a bad battery read is null."""
+    client.post("/readings", json=make_reading(), headers=auth)
+    client.post("/readings", json=make_reading(reading_id="b-1", batt_v=None), headers=auth)
+    assert [(r["batt_v"], r["charge_state"]) for r in stored_rows(db_path)] == [
+        (None, None),
+        (None, None),
+    ]
+
+
+def test_bad_charge_state_is_rejected(client: TestClient, auth: dict) -> None:
+    response = client.post("/readings", json=make_reading(charge_state="DONE"), headers=auth)
+    assert response.status_code == 422
+
+
 def test_bad_reset_reason_is_rejected(client: TestClient, auth: dict) -> None:
     response = client.post(
         "/readings", json=make_reading(reset_reason="Robert'); DROP"), headers=auth

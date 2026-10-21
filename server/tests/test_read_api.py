@@ -286,6 +286,7 @@ def test_series_aggregates_buckets(client: TestClient, db_path: Path) -> None:
             wind_peak_kmh=float(10 * i),
             rain_tips=1,
             rain_mm=0.2794,
+            batt_v=3.8 + i / 100,
         )
 
     body = series(client, START, START + timedelta(days=7))
@@ -300,6 +301,7 @@ def test_series_aggregates_buckets(client: TestClient, db_path: Path) -> None:
     assert point["wind_avg_kmh"] == 2.5
     assert point["wind_peak_kmh"] == 50.0
     assert point["rain_mm"] == pytest.approx(1.68, abs=0.01)
+    assert point["batt_v"] == pytest.approx(3.825, abs=0.01)
 
 
 def test_series_bucket_boundary_jitter_is_not_a_gap(client: TestClient, db_path: Path) -> None:

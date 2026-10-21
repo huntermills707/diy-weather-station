@@ -60,6 +60,8 @@ class StoredReading(BaseModel):
     boot_count: int | None
     reset_reason: str | None
     queue_dropped: int | None
+    batt_v: float | None
+    charge_state: Literal["charging", "full", "idle", "unknown"] | None
     quality: list[str]
 
 
@@ -115,6 +117,7 @@ class SeriesPoint(BaseModel):
     wind_avg_kmh: float | None
     wind_peak_kmh: float | None
     rain_mm: float | None
+    batt_v: float | None
 
 
 class Series(BaseModel):

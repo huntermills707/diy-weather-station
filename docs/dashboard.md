@@ -32,7 +32,7 @@ One page, top to bottom:
 4. **History**: a 24 h / 7 days / 30 days switch, then charts of
    temperature (average line, min-max band when points are averages),
    humidity, station pressure, wind (average and gust), rain per interval,
-   and a wind rose for the same period. A note above the charts says what
+   battery voltage, and a wind rose for the same period. A note above the charts says what
    one point is ("one five-minute reading" or "averages 2 h of readings").
    Touching or hovering a chart shows the time and values of the nearest
    point.
@@ -43,6 +43,11 @@ One page, top to bottom:
    24 hours, the last reboot (lifetime boot number and reset reason), the
    upload queue (readings dropped because it was full), and the last reading
    ID. The reboot and queue rows appear once the station runs M4 firmware.
+   With JAE-73 firmware, two more rows show the battery and solar charging:
+   the battery voltage with a rough charge level from a Li-ion voltage
+   table (about 55 % at 3.8 V, 100 % at 4.2 V, in steps of 5 %; left out
+   while charging, when the voltage reads high), and the charge state
+   ("Charging", "Full", or "Not charging (no solar input)").
 
 On a phone the cards sit two per row (wind full width) and the charts stack
 in one column. On a wide screen the cards fit one row and the charts two
@@ -87,7 +92,7 @@ missing.
 | Missing readings in history | The chart line breaks ([gap rule](read-api.md#get-apiseries)). A sensor fault breaks only that sensor's line. |
 | No data in a chart's range | "No data in this period". The rain chart says "No rain in this period". |
 | Wind rose with only calm or unknown readings | A message saying so; the calm and unknown counts are always listed under the rose. |
-| Health warnings | Amber for: stale, fewer than 95 % of expected readings, a reboot, unsynced clock, weak WiFi, flagged readings, a last reboot caused by a watchdog, panic, or brownout, and dropped queue readings. Red for a BME280 error. |
+| Health warnings | Amber for: stale, fewer than 95 % of expected readings, a reboot, unsynced clock, weak WiFi, flagged readings, a last reboot caused by a watchdog, panic, or brownout, dropped queue readings, and a battery at or below 3.5 V (the low-battery alert's threshold) or not reading. Red for a BME280 error and a battery below 3.3 V. |
 
 ## Refresh
 
