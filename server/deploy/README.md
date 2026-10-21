@@ -144,8 +144,8 @@ systemctl list-timers weather-station-backup    # next run 03:17
 
 ## Alerts
 
-Notifications for an offline station, freeze risk, and a missing backup
-([docs/alerts.md](../../docs/alerts.md)), delivered by a self-hosted
+Notifications for an offline station, freeze risk, a low station battery,
+and a missing backup ([docs/alerts.md](../../docs/alerts.md)), delivered by a self-hosted
 [ntfy](https://docs.ntfy.sh) server on the Pi.
 
 ```sh
