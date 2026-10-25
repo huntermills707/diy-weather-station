@@ -24,6 +24,10 @@ constexpr uint32_t CAL_PRINT_MS = 500;
 // about 2 x HTTP_TIMEOUT_MS.
 constexpr uint32_t WATCHDOG_TIMEOUT_S = 30;
 
+// CPU clock. loop() never sleeps, so the CPU draws full power all the time;
+// 80 MHz (the lowest that keeps WiFi) cuts that versus the 240 MHz default.
+constexpr uint32_t CPU_FREQ_MHZ = 80;
+
 BME280 bme280;
 bool bme280Ok = false;
 bool calMode = false;
@@ -175,7 +179,20 @@ static void report() {
 static void printHelp() {
     Serial.println(
         "commands: s=sample report now, q=upload queue status, c=toggle calibration stream, "
-        "x=hang (watchdog test), h=help");
+        "i=I2C bus scan, x=hang (watchdog test), h=help");
+}
+
+static void scanI2c() {
+    // Probes every 7-bit address; a device ACKs an empty write at its address.
+    int found = 0;
+    for (uint8_t addr = 0x08; addr < 0x78; addr++) {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0) {
+            Serial.printf("i2c: device at 0x%02x\n", addr);
+            found++;
+        }
+    }
+    Serial.printf("i2c: scan done, %d device(s)\n", found);
 }
 
 static void handleSerial() {
@@ -198,6 +215,9 @@ static void handleSerial() {
             case 'q':
                 uploadQueuePrintStatus();
                 break;
+            case 'i':
+                scanI2c();
+                break;
             case 'x':
                 // Stops loop() so the watchdog fires; the next boot reports
                 // reset_reason=task_watchdog.
@@ -215,12 +235,14 @@ static void handleSerial() {
 }
 
 void setup() {
+    setCpuFrequencyMhz(CPU_FREQ_MHZ);
     Serial.begin(115200);
     delay(1000);  // let USB-serial settle before first print
     Serial.println("weather station firmware up");
     bootCount = countBoot();
     resetReason = resetReasonText(esp_reset_reason());
     Serial.printf("boot #%lu, reset reason %s\n", (unsigned long)bootCount, resetReason);
+    Serial.printf("cpu: %lu MHz\n", (unsigned long)getCpuFrequencyMhz());
     printHelp();
 
     Wire.begin();
