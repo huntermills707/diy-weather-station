@@ -22,6 +22,21 @@ The battery is a Horbupa E26-1S2P pack: two 18650 cells in parallel,
 DC-044 solar jack through a USB-C to barrel adapter. The board's own USB-C
 port also charges, but it cuts out the solar input while in use.
 
+**Power.** The station runs from the charger's 3.3 V output, wired to the
+carrier's 3.3V pin with a GND wire alongside. This feeds the carrier's 3.3 V
+rail directly and bypasses its own regulator, so the carrier's USB-C and
+battery inputs are unused in the field. The charger's 5 V output is not
+used.
+
+| Charger | Carrier | Purpose |
+| ------- | ------- | ------- |
+| 3.3V | 3.3V | Station supply |
+| GND | GND | Supply return |
+
+When the carrier is also plugged into USB for flashing or serial capture,
+both its regulator and the charger drive the 3.3 V rail. Unplug one of
+them first.
+
 **Wiring.** The board's status header (unsoldered as shipped) goes to the
 carrier's soil moisture terminal, unused since soil moisture was dropped,
 and to the PWM0 header:
@@ -51,7 +66,8 @@ boot selects 1.8 V flash and the board won't start.
   the cell read 4.06 V while the charger held it at 4.2 V, so
   `BATT_DIVIDER_RATIO` is calibrated to 1.52 (`firmware/calibration.h`).
   Not yet checked against a multimeter.
-- **The station runs from the charger's 5 V output.** It kept running with
-  the PC's USB unplugged. The carrier's BATT_VIN/3 pin (GPIO39) read
-  1.65 V, a 4.96 V supply. That is the carrier's input, not the battery, so
-  firmware doesn't read it.
+- **The bench setup ran from the charger's 5 V output** into the carrier's
+  input. The carrier's BATT_VIN/3 pin (GPIO39) read 1.65 V, a 4.96 V
+  supply. The field station now uses the 3.3 V output instead (see
+  **Power**), which leaves the carrier's input, and GPIO39, unpowered.
+  Firmware doesn't read GPIO39 either way.
