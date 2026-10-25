@@ -92,8 +92,11 @@ wind 5 ms) to reject reed-switch bounce and mechanical settling.
 
 The charger is a WatangTech 5V solar charger, a rebrand of the Seengreat
 Solar Energy Manager C (CN3166, [wiki](https://seengreat.com/wiki/185/)).
-Its status header is wired to the soil moisture terminal, unused since soil
-moisture was dropped, and to PWM0. CHRG and DONE are open-drain with 10k
+The station runs from the charger's 3.3 V output, wired to the carrier's
+3.3V pin (see [hardware/README.md](../hardware/README.md#solar-charger-and-battery-jae-73));
+unplug it before connecting USB. The charger's status header is wired to
+the soil moisture terminal, unused since soil moisture was dropped, and to
+PWM0. CHRG and DONE are open-drain with 10k
 pull-ups on the charger, so firmware uses plain `INPUT`. Those pull-ups are
 powered from the solar input: with no input (night, or a panel indoors)
 both lines read low, which firmware reports as `idle`. Leave
@@ -108,6 +111,14 @@ are in [docs/sensors.md](../docs/sensors.md). Every tunable value lives in
 `calibration.h`. Rain and wind use SparkFun's published Weather Meter Kit
 values; the `VANE_ADC` table is field-calibrated for this unit, with SparkFun's
 table as the fallback for new hardware.
+
+## Power
+
+The CPU runs at 80 MHz (`CPU_FREQ_MHZ` in `firmware.ino`), the lowest clock
+that keeps WiFi, instead of the 240 MHz default. `loop()` never sleeps, so the
+CPU draws full power all the time and the clock sets most of that draw. WiFi
+modem sleep is already on: Arduino-ESP32 defaults to `WIFI_PS_MIN_MODEM`.
+Boot prints `cpu: 80 MHz`.
 
 ## Serial output and commands (115200 baud)
 
@@ -141,7 +152,7 @@ table as the fallback for new hardware.
 - Commands: `s` = print a sample report now (resets the window) and queue
   it, `q` = upload queue status (depth, dropped, rejected, failures, next
   retry), `c` = toggle the calibration stream (raw vane ADC and heading),
-  `x` = hang on purpose to test the watchdog, `h` = help.
+  `i` = scan the I2C bus and list the addresses that answer, `x` = hang on purpose to test the watchdog, `h` = help.
 
 ## Watchdog and recovery (JAE-62)
 
