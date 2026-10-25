@@ -109,6 +109,14 @@ are in [docs/sensors.md](../docs/sensors.md). Every tunable value lives in
 values; the `VANE_ADC` table is field-calibrated for this unit, with SparkFun's
 table as the fallback for new hardware.
 
+## Power
+
+The CPU runs at 80 MHz (`CPU_FREQ_MHZ` in `firmware.ino`), the lowest clock
+that keeps WiFi, instead of the 240 MHz default. `loop()` never sleeps, so the
+CPU draws full power all the time and the clock sets most of that draw. WiFi
+modem sleep is already on: Arduino-ESP32 defaults to `WIFI_PS_MIN_MODEM`.
+Boot prints `cpu: 80 MHz`.
+
 ## Serial output and commands (115200 baud)
 
 - `report ...` every five minutes (ADR 0001 cadence): reading ID, UTC time,
@@ -141,7 +149,7 @@ table as the fallback for new hardware.
 - Commands: `s` = print a sample report now (resets the window) and queue
   it, `q` = upload queue status (depth, dropped, rejected, failures, next
   retry), `c` = toggle the calibration stream (raw vane ADC and heading),
-  `x` = hang on purpose to test the watchdog, `h` = help.
+  `i` = scan the I2C bus and list the addresses that answer, `x` = hang on purpose to test the watchdog, `h` = help.
 
 ## Watchdog and recovery (JAE-62)
 
