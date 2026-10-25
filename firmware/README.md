@@ -92,8 +92,11 @@ wind 5 ms) to reject reed-switch bounce and mechanical settling.
 
 The charger is a WatangTech 5V solar charger, a rebrand of the Seengreat
 Solar Energy Manager C (CN3166, [wiki](https://seengreat.com/wiki/185/)).
-Its status header is wired to the soil moisture terminal, unused since soil
-moisture was dropped, and to PWM0. CHRG and DONE are open-drain with 10k
+The station runs from the charger's 3.3 V output, wired to the carrier's
+3.3V pin (see [hardware/README.md](../hardware/README.md#solar-charger-and-battery-jae-73));
+unplug it before connecting USB. The charger's status header is wired to
+the soil moisture terminal, unused since soil moisture was dropped, and to
+PWM0. CHRG and DONE are open-drain with 10k
 pull-ups on the charger, so firmware uses plain `INPUT`. Those pull-ups are
 powered from the solar input: with no input (night, or a panel indoors)
 both lines read low, which firmware reports as `idle`. Leave
