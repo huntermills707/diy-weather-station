@@ -55,10 +55,11 @@ columns.
 
 ## Units
 
-A switch in the header picks **°F · mph** or **°C · km/h** for temperature
-(including dew point and heat index) and wind speed, everywhere on the page.
-It defaults to °F · mph in a US English browser and °C · km/h elsewhere, and
-the browser remembers the choice. Rain stays in mm and pressure in hPa. The
+A switch in the header picks **°F · mph** (rain in inches) or **°C · km/h**
+(rain in mm) for temperature (including dew point and heat index), wind speed
+and rain, everywhere on the page. It defaults to °F · mph in a US English
+browser and °C · km/h elsewhere, and the browser remembers the choice.
+Pressure stays in hPa. The
 API is always metric; the dashboard converts for display, and wind rose
 speed classes are rounded to whole mph (2, 10, 20, 30 km/h become 1, 6, 12,
 19 mph).

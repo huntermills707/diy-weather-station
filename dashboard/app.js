@@ -11,16 +11,18 @@ const HISTORY_EVERY_MS = 5 * 60e3;
 const HEAT_INDEX_FROM_C = 26.7;
 // Same calm limit as the server's wind rose (docs/read-api.md).
 const CALM_KMH = 2;
-// The API is metric; the dashboard converts temperature and wind speed for
-// display. Rain stays in mm and pressure in hPa.
+// The API is metric; the dashboard converts temperature, wind speed and rain
+// for display. Pressure stays in hPa. Rain digits are for totals on the card.
 const UNIT_SYSTEMS = {
   us: {
     temp: { unit: "°F", convert: (c) => (c * 9) / 5 + 32 },
     speed: { unit: "mph", convert: (kmh) => kmh / 1.609344 },
+    rain: { unit: "in", convert: (mm) => mm / 25.4, digits: 2 },
   },
   metric: {
     temp: { unit: "°C", convert: (c) => c },
     speed: { unit: "km/h", convert: (kmh) => kmh },
+    rain: { unit: "mm", convert: (mm) => mm, digits: 1 },
   },
 };
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -76,7 +78,7 @@ function fixed(value, digits) {
   return value == null ? "—" : value.toFixed(digits);
 }
 
-// Convert a metric value of a quantity ("temp" or "speed") to the chosen units.
+// Convert a metric value of a quantity ("temp", "speed" or "rain") to the chosen units.
 function convert(quantity, value) {
   return value == null ? null : UNIT_SYSTEMS[state.units][quantity].convert(value);
 }
@@ -333,14 +335,15 @@ function renderConditions(data) {
 
 function setRain(data) {
   const rain = data.rain;
-  setValue("rain", rain.today_mm, 1, "mm");
+  const { unit, digits } = UNIT_SYSTEMS[state.units].rain;
+  setValue("rain", convert("rain", rain.today_mm), digits, unit);
   // Non-breaking spaces keep each total on one line when the text wraps.
   let detail = [
     ["Last hour", rain.last_hour_mm],
     ["24 h", rain.last_24h_mm],
     ["this month", rain.month_mm],
   ]
-    .map(([label, mm]) => `${label.replaceAll(" ", "\u00a0")}\u00a0${fixed(mm, 1)}\u00a0mm`)
+    .map(([label, mm]) => `${label.replaceAll(" ", "\u00a0")}\u00a0${fixed(convert("rain", mm), digits)}\u00a0${unit}`)
     .join(" · ");
   if (data.timezone !== browserZone) detail += ` (days in ${data.timezone})`;
   setText("rain-detail", detail);
@@ -457,7 +460,7 @@ const CHARTS = {
   },
   rain: {
     bars: { key: "rain_mm", color: "var(--rain)", label: "Rain" },
-    unit: "mm",
+    quantity: "rain",
     digits: 2,
     fromZero: true,
   },
@@ -481,6 +484,7 @@ function renderHistory() {
     const point = { ...p, t: Date.parse(p.time) };
     for (const key of ["temp_c", "temp_min_c", "temp_max_c"]) point[key] = convert("temp", p[key]);
     for (const key of ["wind_avg_kmh", "wind_peak_kmh"]) point[key] = convert("speed", p[key]);
+    point.rain_mm = convert("rain", p.rain_mm);
     return point;
   });
   const start = Date.parse(series.start);
