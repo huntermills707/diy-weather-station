@@ -11,18 +11,20 @@ const HISTORY_EVERY_MS = 5 * 60e3;
 const HEAT_INDEX_FROM_C = 26.7;
 // Same calm limit as the server's wind rose (docs/read-api.md).
 const CALM_KMH = 2;
-// The API is metric; the dashboard converts temperature, wind speed and rain
-// for display. Pressure stays in hPa. Rain digits are for totals on the card.
+// The API is metric; the dashboard converts temperature, wind speed, rain and
+// pressure for display. Digits are for the values on the cards.
 const UNIT_SYSTEMS = {
   us: {
     temp: { unit: "°F", convert: (c) => (c * 9) / 5 + 32 },
     speed: { unit: "mph", convert: (kmh) => kmh / 1.609344 },
     rain: { unit: "in", convert: (mm) => mm / 25.4, digits: 2 },
+    pressure: { unit: "inHg", convert: (hpa) => hpa / 33.8639, digits: 2 },
   },
   metric: {
     temp: { unit: "°C", convert: (c) => c },
     speed: { unit: "km/h", convert: (kmh) => kmh },
     rain: { unit: "mm", convert: (mm) => mm, digits: 1 },
+    pressure: { unit: "hPa", convert: (hpa) => hpa, digits: 1 },
   },
 };
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -78,7 +80,7 @@ function fixed(value, digits) {
   return value == null ? "—" : value.toFixed(digits);
 }
 
-// Convert a metric value of a quantity ("temp", "speed" or "rain") to the chosen units.
+// Convert a metric value of a quantity ("temp", "speed", "rain" or "pressure") to the chosen units.
 function convert(quantity, value) {
   return value == null ? null : UNIT_SYSTEMS[state.units][quantity].convert(value);
 }
@@ -293,11 +295,15 @@ function renderConditions(data) {
   setValue("humidity", r.rh_pct, 0, "%");
   setText("humidity-detail", sensorReason || "Relative humidity");
 
+  const pressure = UNIT_SYSTEMS[state.units].pressure;
   if (d.sea_level_hpa != null) {
-    setValue("pressure", d.sea_level_hpa, 1, "hPa");
-    setText("pressure-detail", `Sea level · station ${fixed(r.press_hpa, 1)} hPa`);
+    setValue("pressure", convert("pressure", d.sea_level_hpa), pressure.digits, pressure.unit);
+    setText(
+      "pressure-detail",
+      `Sea level · station ${fixed(convert("pressure", r.press_hpa), pressure.digits)} ${pressure.unit}`,
+    );
   } else {
-    setValue("pressure", r.press_hpa, 1, "hPa");
+    setValue("pressure", convert("pressure", r.press_hpa), pressure.digits, pressure.unit);
     setText(
       "pressure-detail",
       sensorReason ||
@@ -445,8 +451,8 @@ const CHARTS = {
   },
   pressure: {
     lines: [{ key: "press_hpa", color: "var(--pressure)", label: "Pressure" }],
-    unit: "hPa",
-    digits: 1,
+    quantity: "pressure",
+    digits: { us: 2, metric: 1 },
   },
   wind: {
     lines: [
@@ -485,6 +491,7 @@ function renderHistory() {
     for (const key of ["temp_c", "temp_min_c", "temp_max_c"]) point[key] = convert("temp", p[key]);
     for (const key of ["wind_avg_kmh", "wind_peak_kmh"]) point[key] = convert("speed", p[key]);
     point.rain_mm = convert("rain", p.rain_mm);
+    point.press_hpa = convert("pressure", p.press_hpa);
     return point;
   });
   const start = Date.parse(series.start);
@@ -677,7 +684,9 @@ function attachTooltip(plot, svg, cursor, spec, points, x, bucketS) {
     const when = new Date(best.t);
     const lines = [bucketS > 300 ? `${fmtDateTime.format(when)} (avg of ${best.n})` : fmtDateTime.format(when)];
     const unit = spec.quantity ? unitOf(spec.quantity) : spec.unit;
-    for (const item of items) lines.push(`${item.label}: ${fixed(best[item.key], spec.digits)} ${unit}`);
+    // Digits are either fixed or per unit system ({ us, metric }).
+    const digits = typeof spec.digits === "object" ? spec.digits[state.units] : spec.digits;
+    for (const item of items) lines.push(`${item.label}: ${fixed(best[item.key], digits)} ${unit}`);
     if (best.flagged) lines.push(`${best.flagged} flagged ${plural(best.flagged, "reading")} left out`);
     tooltip.textContent = lines.join("\n");
     tooltip.hidden = false;
