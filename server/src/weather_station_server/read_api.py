@@ -83,6 +83,9 @@ class Derived(BaseModel):
     heat_index_c: float | None
     sea_level_hpa: float | None
     altitude_m: float | None
+    # US EPA AQI from the latest reading's five-minute PM2.5 average.
+    aqi: int | None
+    aqi_category: str | None
 
 
 class RainTotals(BaseModel):
@@ -133,6 +136,9 @@ class SeriesPoint(BaseModel):
     wind_peak_kmh: float | None
     rain_mm: float | None
     batt_v: float | None
+    pm25_ugm3: float | None
+    pm10_ugm3: float | None
+    gas_kohm: float | None
 
 
 class Series(BaseModel):
@@ -207,6 +213,7 @@ async def current(request: Request, station: Station = "station-1") -> Current:
             None if quality.is_flagged(flags, name) else row[name]
             for name in ("temp_c", "rh_pct", "press_hpa")
         )
+        aqi = derived.aqi_pm25(row["pm25_ugm3"])
         metrics = Derived(
             dew_point_c=_round(derived.dew_point_c(temp_c, rh_pct)),
             heat_index_c=_round(derived.heat_index_c(temp_c, rh_pct)),
@@ -214,6 +221,8 @@ async def current(request: Request, station: Station = "station-1") -> Current:
                 derived.sea_level_pressure_hpa(press_hpa, temp_c, state.altitude_m)
             ),
             altitude_m=state.altitude_m,
+            aqi=aqi[0] if aqi else None,
+            aqi_category=aqi[1] if aqi else None,
         )
         activity = await query(history.recent_activity, state.db_path, station, now)
         received = history.parse_utc(row["received_at"])

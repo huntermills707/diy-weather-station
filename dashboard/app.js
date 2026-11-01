@@ -36,6 +36,19 @@ const BATTERY_PCT = [
 ];
 const BATTERY_LOW_V = 3.5;
 const BATTERY_CRITICAL_V = 3.3;
+// The server's AQI categories (derived.py), with their EPA colors.
+const AQI_COLORS = {
+  Good: "var(--aqi-good)",
+  Moderate: "var(--aqi-moderate)",
+  "Unhealthy for sensitive groups": "var(--aqi-sensitive)",
+  Unhealthy: "var(--aqi-unhealthy)",
+  "Very unhealthy": "var(--aqi-very-unhealthy)",
+  Hazardous: "var(--aqi-hazardous)",
+};
+const SENSOR_REASON = {
+  implausible: "Sensor reading out of range",
+  error: "Sensor not responding",
+};
 const CHARGE_TEXT = {
   charging: "Charging",
   full: "Full",
@@ -229,10 +242,11 @@ function renderCurrent(data) {
     status.textContent = "No readings yet";
     banner.hidden = false;
     banner.textContent = `The server has no readings from ${STATION} yet.`;
-    for (const name of ["temp", "humidity", "pressure", "wind", "rain"]) {
+    for (const name of ["temp", "humidity", "pressure", "wind", "rain", "aqi"]) {
       setValue(name, null);
       setText(`${name}-detail`, "");
     }
+    setText("air-detail", "");
     field("wind-arrow").style.display = "none";
     document.getElementById("health").replaceChildren();
     return;
@@ -274,10 +288,7 @@ function markSuspect(name, reason, keep = false) {
 function renderConditions(data) {
   const r = data.reading;
   const d = data.derived;
-  const sensorReason = {
-    implausible: "Sensor reading out of range",
-    error: "Sensor not responding",
-  }[r.bme680 ?? r.bme280];
+  const sensorReason = SENSOR_REASON[r.bme680 ?? r.bme280];
 
   const tempUnit = unitOf("temp");
   setValue("temp", convert("temp", r.temp_c), 1, tempUnit);
@@ -337,6 +348,33 @@ function renderConditions(data) {
   markSuspect("wind", suspectReason(r, "wind_") || suspectReason(r, "gust_"), true);
 
   setRain(data);
+  setAir(data);
+}
+
+function setAir(data) {
+  const r = data.reading;
+  const d = data.derived;
+  // Firmware before JAE-74 had no air quality sensors.
+  if (r.pmsa003i == null) {
+    setValue("aqi", null);
+    setText("aqi-detail", "No particle sensor");
+    setText("air-detail", "");
+    return;
+  }
+  setValue("aqi", d.aqi, 0, "AQI");
+  const detail = field("aqi-detail");
+  if (d.aqi == null) {
+    detail.textContent = SENSOR_REASON[r.pmsa003i] || "";
+  } else {
+    const dot = document.createElement("span");
+    dot.className = "aqi-dot";
+    dot.style.background = AQI_COLORS[d.aqi_category];
+    detail.replaceChildren(dot, `${d.aqi_category} · PM2.5\u00a0${fixed(r.pm25_ugm3, 1)}\u00a0µg/m³`);
+  }
+  const parts = [];
+  if (r.pm10_ugm3 != null) parts.push(`PM10\u00a0${fixed(r.pm10_ugm3, 1)}\u00a0µg/m³`);
+  if (r.gas_kohm != null) parts.push(`VOC\u00a0gas\u00a0${Math.round(r.gas_kohm)}\u00a0kΩ`);
+  setText("air-detail", parts.join(" · "));
 }
 
 function setRain(data) {
@@ -391,6 +429,7 @@ function renderHealth(data) {
     ["WiFi signal", signal, signalClass],
     // The BME680 replaced the BME280 for temperature, humidity and pressure (JAE-74).
     h.bme680 ? ["BME680 sensor", ...sensor[h.bme680]] : ["BME280 sensor", ...sensor[h.bme280]],
+    ...(h.pmsa003i ? [["PMSA003I sensor", ...sensor[h.pmsa003i]]] : []),
     [
       "Data quality, last 24 h",
       h.flagged_24h ? `${h.flagged_24h} ${plural(h.flagged_24h, "reading")} flagged` : "None flagged",
@@ -470,6 +509,21 @@ const CHARTS = {
     quantity: "rain",
     digits: 2,
     fromZero: true,
+  },
+  particulates: {
+    lines: [
+      { key: "pm25_ugm3", color: "var(--pm25)", label: "PM2.5" },
+      { key: "pm10_ugm3", color: "var(--pm10)", label: "PM10" },
+    ],
+    unit: "µg/m³",
+    digits: 1,
+    fromZero: true,
+    legend: true,
+  },
+  gas: {
+    lines: [{ key: "gas_kohm", color: "var(--gas)", label: "Gas" }],
+    unit: "kΩ",
+    digits: 0,
   },
   battery: {
     lines: [{ key: "batt_v", color: "var(--battery)", label: "Battery" }],

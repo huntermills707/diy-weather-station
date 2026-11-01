@@ -18,7 +18,7 @@ One page, top to bottom:
    unreachable).
 2. **Banner** (only when something is wrong): stale data, no readings yet,
    or server unreachable.
-3. **Current conditions**: five cards.
+3. **Current conditions**: six cards.
    - **Temperature**, with dew point, and the heat index in warm weather
      (26.7 °C and up).
    - **Humidity**.
@@ -26,20 +26,26 @@ One page, top to bottom:
      pressure underneath. Otherwise station pressure, labelled
      "altitude not set".
    - **Rain today**, with the last hour, the last 24 hours, and this month.
+   - **Air quality** (JAE-74): the US EPA AQI from PM2.5, its category with
+     the EPA color, PM2.5 and PM10 in µg/m³, and the BME680's VOC gas
+     resistance in kΩ. The AQI uses the latest five-minute average, not the
+     EPA's 24-hour or NowCast average, so it reacts faster than AirNow.
+     "No particle sensor" for readings from firmware before JAE-74.
    - **Wind**: the average, gust, and direction as a compass needle and a
      label ("from WNW (293°)"). The needle points into the wind, like the
      vane.
 4. **History**: a 24 h / 7 days / 30 days switch, then charts of
    temperature (average line, min-max band when points are averages),
    humidity, station pressure, wind (average and gust), rain per interval,
-   battery voltage, and a wind rose for the same period. A note above the charts says what
+   particulates (PM2.5 and PM10), VOC gas resistance, battery voltage, and
+   a wind rose for the same period. A note above the charts says what
    one point is ("one five-minute reading" or "averages 2 h of readings").
    Touching or hovering a chart shows the time and values of the nearest
    point.
 5. **Station health**: the last reading time and age, readings in the last
    24 hours out of 288, reboots in the last 24 hours, uptime, station clock
-   sync, WiFi signal (good ≥ -60 dBm, fair ≥ -70 dBm, weak below), BME280
-   status, readings with [data-quality flags](data-quality.md) in the last
+   sync, WiFi signal (good ≥ -60 dBm, fair ≥ -70 dBm, weak below), BME680
+   and PMSA003I status (BME280 for readings before JAE-74), readings with [data-quality flags](data-quality.md) in the last
    24 hours, the last reboot (lifetime boot number and reset reason), the
    upload queue (readings dropped because it was full), and the last reading
    ID. The reboot and queue rows appear once the station runs M4 firmware.
@@ -50,8 +56,8 @@ One page, top to bottom:
    ("Charging", "Full", or "Not charging (no solar input)").
 
 On a phone the cards sit two per row (wind full width) and the charts stack
-in one column. On a wide screen the cards fit one row and the charts two
-columns.
+in one column. On a wide screen the cards take two rows (wind, two cards
+wide, starts the second) and the charts two columns.
 
 ## Units
 
@@ -85,14 +91,15 @@ missing.
 | No readings at all | "No readings yet" status and banner; every card shows "—". |
 | Server unreachable | Red status "Server unreachable" and a banner with the error. The last data received stays on screen, and the page keeps retrying every minute. |
 | Value flagged by a [data-quality rule](data-quality.md) | The card keeps the value (it is what the station sent) with an amber "Suspect: outside plausible range" or "Suspect: unchanged for 2 h". Derived values that use it show "—". Charts leave it out, and the tooltip says how many flagged readings a point left out. The wind rose lists flagged readings under the rose. |
-| BME280 `error` or `implausible` | Temperature, humidity, and pressure show "—" with "Sensor not responding" or "Sensor reading out of range". Derived values show "—". Health shows the sensor status in red or amber. |
+| BME680 (or BME280) `error` or `implausible` | Temperature, humidity, and pressure show "—" with "Sensor not responding" or "Sensor reading out of range". Derived values show "—". Health shows the sensor status in red or amber. |
+| PMSA003I `error` | The AQI shows "—" with "Sensor not responding"; PM10 is left out. Health shows the sensor status in red. |
 | Wind vane unknown | No compass needle; "direction unknown (vane)". |
 | Calm (average below 2 km/h) | No needle; "calm". In still air the vane only holds its last position. |
 | Altitude not configured | Station pressure instead of sea level, labelled "altitude not set". |
 | Missing readings in history | The chart line breaks ([gap rule](read-api.md#get-apiseries)). A sensor fault breaks only that sensor's line. |
 | No data in a chart's range | "No data in this period". The rain chart says "No rain in this period". |
 | Wind rose with only calm or unknown readings | A message saying so; the calm and unknown counts are always listed under the rose. |
-| Health warnings | Amber for: stale, fewer than 95 % of expected readings, a reboot, unsynced clock, weak WiFi, flagged readings, a last reboot caused by a watchdog, panic, or brownout, dropped queue readings, and a battery at or below 3.5 V (the low-battery alert's threshold) or not reading. Red for a BME280 error and a battery below 3.3 V. |
+| Health warnings | Amber for: stale, fewer than 95 % of expected readings, a reboot, unsynced clock, weak WiFi, flagged readings, a last reboot caused by a watchdog, panic, or brownout, dropped queue readings, and a battery at or below 3.5 V (the low-battery alert's threshold) or not reading. Red for a sensor error and a battery below 3.3 V. |
 
 ## Refresh
 

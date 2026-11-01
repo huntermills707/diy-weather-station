@@ -1,6 +1,11 @@
 import pytest
 
-from weather_station_server.derived import dew_point_c, heat_index_c, sea_level_pressure_hpa
+from weather_station_server.derived import (
+    aqi_pm25,
+    dew_point_c,
+    heat_index_c,
+    sea_level_pressure_hpa,
+)
 
 
 def to_f(temp_c: float) -> float:
@@ -68,3 +73,23 @@ def test_sea_level_pressure() -> None:
 )
 def test_unavailable_inputs_give_unavailable_outputs(call) -> None:
     assert call() is None
+
+
+@pytest.mark.parametrize(
+    ("pm25", "expected"),
+    [
+        (0.0, (0, "Good")),
+        (9.0, (50, "Good")),
+        (9.05, (50, "Good")),  # truncated to 9.0, not rounded up
+        (9.1, (51, "Moderate")),
+        (35.4, (100, "Moderate")),
+        (35.5, (101, "Unhealthy for sensitive groups")),
+        (12.0, (56, "Moderate")),  # EPA AirNow calculator
+        (100.0, (182, "Unhealthy")),
+        (325.4, (500, "Hazardous")),
+        (900.0, (500, "Hazardous")),
+        (None, None),
+    ],
+)
+def test_aqi_pm25(pm25: float | None, expected: tuple[int, str] | None) -> None:
+    assert aqi_pm25(pm25) == expected

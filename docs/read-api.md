@@ -89,7 +89,9 @@ The latest reading, with derived metrics, rain totals, and station health.
     "dew_point_c": 13.8,
     "heat_index_c": 30.0,
     "sea_level_hpa": 1010.8,
-    "altitude_m": 50.0
+    "altitude_m": 50.0,
+    "aqi": 19,
+    "aqi_category": "Good"
   },
   "rain": { "last_hour_mm": 0.0, "last_24h_mm": 0.0, "today_mm": 0.0, "month_mm": 1.68 },
   "health": {
@@ -190,6 +192,23 @@ Without that setting `sea_level_hpa` is `null`; the altitude is echoed as
 `altitude_m`. Indoors the measured temperature isn't the outdoor air's, so
 expect a small error until the station is outside.
 
+**Air quality index:** the US EPA AQI for PM2.5 (2024 breakpoints), from
+the latest reading's `pm25_ugm3`, truncated to 0.1 µg/m³ as the EPA does:
+
+| PM2.5 µg/m³ | AQI | `aqi_category` |
+| ----------- | --- | -------------- |
+| 0.0-9.0 | 0-50 | Good |
+| 9.1-35.4 | 51-100 | Moderate |
+| 35.5-55.4 | 101-150 | Unhealthy for sensitive groups |
+| 55.5-125.4 | 151-200 | Unhealthy |
+| 125.5-225.4 | 201-300 | Very unhealthy |
+| 225.5-325.4 | 301-500 | Hazardous |
+
+Linear within each band, and 500 above it. The EPA applies the scale to a
+24-hour (or NowCast) average; here it is the five-minute window average, so
+it reacts faster than AirNow's figure. `aqi` and `aqi_category` are `null`
+without a PM2.5 value (firmware before JAE-74, or `pmsa003i` not `ok`).
+
 ## `GET /api/series`
 
 Readings over a range, downsampled on the server.
@@ -211,7 +230,10 @@ Readings over a range, downsampled on the server.
       "wind_avg_kmh": 0.0,
       "wind_peak_kmh": 0.0,
       "rain_mm": 0.0,
-      "batt_v": 3.85
+      "batt_v": 3.85,
+      "pm25_ugm3": 3.4,
+      "pm10_ugm3": 4.0,
+      "gas_kohm": 152.3
     }
   ]
 }
@@ -237,6 +259,8 @@ point has:
   lowest and highest temperature (`temp_min_c`, `temp_max_c`); the highest
   gust (`wind_peak_kmh`); the total `rain_mm`; and the average battery
   voltage `batt_v` (`null` before JAE-73 firmware)
+- the averages of `pm25_ugm3`, `pm10_ugm3`, and `gas_kohm` (`null` before
+  JAE-74 firmware)
 
 Missing sensor values are left out of the averages, and so are
 [flagged](data-quality.md) ones. If a bucket has no valid value for a field,

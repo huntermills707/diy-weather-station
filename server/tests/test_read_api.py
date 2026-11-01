@@ -106,6 +106,7 @@ def test_current_reports_air_quality_sensors(
 ) -> None:
     insert(db_path, now, bme280=None, bme680="ok", gas_kohm=150.0, pmsa003i="ok", pm25_ugm3=3.4)
     body = client.get("/api/current").json()
+    assert (body["derived"]["aqi"], body["derived"]["aqi_category"]) == (19, "Good")
     assert body["reading"]["gas_kohm"] == 150.0
     assert body["reading"]["pm25_ugm3"] == 3.4
     assert body["health"]["bme280"] is None
@@ -283,6 +284,30 @@ def test_series_raw_readings_with_a_gap(client: TestClient, db_path: Path) -> No
     gap = points[3]
     assert gap["time"] == "2026-10-01T00:17:39.000Z"
     assert all(gap[name] is None for name in gap if name not in ("time", "n", "flagged"))
+
+
+def test_series_averages_air_quality(client: TestClient, db_path: Path) -> None:
+    for i, pm25 in enumerate([2.0, 4.0]):
+        insert(
+            db_path,
+            START + timedelta(minutes=5 * i),
+            bme280=None,
+            bme680="ok",
+            gas_kohm=100.0 * (i + 1),
+            pmsa003i="ok",
+            pm25_ugm3=pm25,
+            pm10_ugm3=pm25 + 1,
+        )
+    [point] = series(client, START, START + timedelta(days=7))["points"]
+    assert (point["pm25_ugm3"], point["pm10_ugm3"], point["gas_kohm"]) == (3.0, 4.0, 150.0)
+
+
+def test_current_without_particulates_has_no_aqi(
+    client: TestClient, db_path: Path, now: datetime
+) -> None:
+    insert(db_path, now)
+    derived = client.get("/api/current").json()["derived"]
+    assert (derived["aqi"], derived["aqi_category"]) == (None, None)
 
 
 def test_series_aggregates_buckets(client: TestClient, db_path: Path) -> None:

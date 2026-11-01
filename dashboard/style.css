@@ -19,6 +19,16 @@
   --gust: #f08c00;
   --rain: #1971c2;
   --battery: #2b8a3e;
+  --pm25: #c2255c;
+  --pm10: #e8890c;
+  --gas: #5c7cfa;
+  /* US EPA AQI category colors, the same in both themes. */
+  --aqi-good: #00e400;
+  --aqi-moderate: #ffff00;
+  --aqi-sensitive: #ff7e00;
+  --aqi-unhealthy: #ff0000;
+  --aqi-very-unhealthy: #8f3f97;
+  --aqi-hazardous: #7e0023;
   --rose-1: #a5d8ff;
   --rose-2: #4dabf7;
   --rose-3: #1c7ed6;
@@ -49,6 +59,9 @@
     --gust: #ffc078;
     --rain: #74c0fc;
     --battery: #69db7c;
+    --pm25: #f06595;
+    --pm10: #ffa94d;
+    --gas: #91a7ff;
     --rose-1: #1d4f7a;
     --rose-2: #2f74b3;
     --rose-3: #5aa2e6;
@@ -454,4 +467,15 @@ a {
     min-width: 0;
     padding: 0 10px;
   }
+}
+
+/* The AQI category's color, as a dot before its name. */
+.aqi-dot {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-right: 0.35em;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  vertical-align: baseline;
 }
