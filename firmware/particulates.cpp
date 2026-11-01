@@ -9,13 +9,17 @@ constexpr uint32_t SAMPLE_MS = 10000;
 // The datasheet asks for 30 s after power-up before readings are stable.
 constexpr uint32_t WARMUP_MS = 30000;
 
-static Adafruit_PM25AQI pmsa003i;
+// Rebuilt for every probe: the library's begin_I2C() fails on any call
+// after the first, even when that first one failed.
+static Adafruit_PM25AQI* pmsa003i = nullptr;
 static bool sensorOk = false;
 static uint32_t nextSampleAt = 0;
 static ParticulateWindow window = {};
 
 static void beginSensor() {
-    sensorOk = pmsa003i.begin_I2C(&Wire);
+    delete pmsa003i;
+    pmsa003i = new Adafruit_PM25AQI();
+    sensorOk = pmsa003i->begin_I2C(&Wire);
     Serial.println(sensorOk ? "pmsa003i: ready" : "pmsa003i: ERROR no response at 0x12");
 }
 
@@ -36,7 +40,7 @@ void particulatesPoll() {
         return;
     }
     PM25_AQI_Data data;
-    if (!pmsa003i.read(&data)) {
+    if (!pmsa003i->read(&data)) {
         return;  // no fresh frame or a bad checksum: skip this sample
     }
     window.samples++;
