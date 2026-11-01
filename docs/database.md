@@ -27,10 +27,10 @@ CREATE TABLE readings (
     wind_avg_kmh  REAL    NOT NULL,
     wind_peak_kmh REAL    NOT NULL,
     wind_dir_deg  REAL,              -- NULL = vane open/shorted
-    temp_c        REAL,              -- NULL unless bme280 = 'ok'
+    temp_c        REAL,              -- NULL unless bme680 (or bme280) = 'ok'
     rh_pct        REAL,
     press_hpa     REAL,
-    bme280        TEXT    NOT NULL,  -- ok | implausible | error
+    bme280        TEXT,              -- ok | implausible | error; before JAE-74
     rssi_dbm      INTEGER,
     boot_count    INTEGER,           -- NULL from firmware before M4
     reset_reason  TEXT,
@@ -38,6 +38,18 @@ CREATE TABLE readings (
     quality       TEXT    NOT NULL DEFAULT '',  -- data-quality flags, '' = clean
     batt_v        REAL,              -- NULL from firmware before JAE-73
     charge_state  TEXT,              -- charging | full | idle | unknown
+    bme680        TEXT,              -- ok | implausible | error; JAE-74 on
+    gas_kohm      REAL,
+    pmsa003i      TEXT,              -- ok | implausible | error
+    pm1_ugm3      REAL,              -- window averages, NULL unless pmsa003i = 'ok'
+    pm25_ugm3     REAL,
+    pm10_ugm3     REAL,
+    particles_03um  REAL,            -- particles above 0.3 um per 0.1 L
+    particles_05um  REAL,
+    particles_1um   REAL,
+    particles_25um  REAL,
+    particles_5um   REAL,
+    particles_10um  REAL,
     UNIQUE (station_id, reading_id)
 );
 CREATE INDEX readings_station_time ON readings (station_id, received_at);
@@ -78,11 +90,14 @@ Notes on the design:
   No running total or daily summary table is kept. Either would need
   rewriting whenever a late reading arrives (backfill), and the index
   already makes sums over a range cheap.
-- `PRAGMA user_version` records the schema version (currently 3). On
+- `PRAGMA user_version` records the schema version (currently 4). On
   startup the service migrates an older file in one transaction. Version 1
   to 2 (M4) adds `boot_count`, `reset_reason`, `queue_dropped`, and
   `quality`, then runs the quality rules over every stored reading. Version
-  2 to 3 (JAE-73) adds `batt_v` and `charge_state`. Adding an
+  2 to 3 (JAE-73) adds `batt_v` and `charge_state`. Version 3 to 4
+  (JAE-74) adds the BME680 and PMSA003I columns and makes `bme280`
+  nullable; SQLite cannot drop NOT NULL in place, so the table is copied
+  into a new one. Adding an
   index does not change the version: `CREATE INDEX IF NOT EXISTS` runs on
   every startup, and older code still reads the file. A server older than
   the file refuses to start.

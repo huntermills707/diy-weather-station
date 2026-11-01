@@ -16,6 +16,7 @@ from pydantic import AwareDatetime, BaseModel
 
 from weather_station_server import derived, history, quality
 from weather_station_server.db import utc_text
+from weather_station_server.models import SensorStatus
 
 log = logging.getLogger("uvicorn.error")
 
@@ -55,13 +56,25 @@ class StoredReading(BaseModel):
     temp_c: float | None
     rh_pct: float | None
     press_hpa: float | None
-    bme280: Literal["ok", "implausible", "error"]
+    bme280: SensorStatus | None
+    bme680: SensorStatus | None
     rssi_dbm: int | None
     boot_count: int | None
     reset_reason: str | None
     queue_dropped: int | None
     batt_v: float | None
     charge_state: Literal["charging", "full", "idle", "unknown"] | None
+    gas_kohm: float | None
+    pmsa003i: SensorStatus | None
+    pm1_ugm3: float | None
+    pm25_ugm3: float | None
+    pm10_ugm3: float | None
+    particles_03um: float | None
+    particles_05um: float | None
+    particles_1um: float | None
+    particles_25um: float | None
+    particles_5um: float | None
+    particles_10um: float | None
     quality: list[str]
 
 
@@ -92,7 +105,9 @@ class Health(BaseModel):
     clock_synced: bool
     clock_offset_s: float | None
     rssi_dbm: int | None
-    bme280: Literal["ok", "implausible", "error"]
+    bme280: SensorStatus | None
+    bme680: SensorStatus | None
+    pmsa003i: SensorStatus | None
 
 
 class Current(BaseModel):
@@ -217,6 +232,8 @@ async def current(request: Request, station: Station = "station-1") -> Current:
             clock_offset_s=None if offset is None else round(offset, 1),
             rssi_dbm=row["rssi_dbm"],
             bme280=row["bme280"],
+            bme680=row["bme680"],
+            pmsa003i=row["pmsa003i"],
             **activity,
         )
     return Current(

@@ -5,7 +5,7 @@ PlatformIO and the Arduino framework.
 
 Responsibilities:
 
-- Read sensors (BME280, rain gauge, anemometer, wind vane) and the solar
+- Read sensors (BME680, PMSA003I, rain gauge, anemometer, wind vane) and the solar
   charger's battery voltage and charge state
 - Connect to WiFi with bounded retry/backoff
 - Timestamp readings in UTC via NTP
@@ -18,7 +18,7 @@ Responsibilities:
 
 `firmware.ino` takes and reports readings and runs the watchdog,
 `weather_meters.*` reads the rain/wind/vane hardware, `power.*` reads the
-charger, `network.*` handles
+charger, `particulates.*` averages the PMSA003I, `network.*` handles
 WiFi, NTP and the HTTP POST, `upload_queue.*` queues and retries uploads, and
 `reading.*` builds the JSON payload.
 
@@ -80,7 +80,9 @@ cp firmware/secrets.example.h firmware/secrets.h
 | Rain gauge    | D1 (RJ11)      | 27         | digital, falling-edge interrupt |
 | Anemometer    | D0 (RJ11)      | 14         | digital, falling-edge interrupt |
 | Wind vane     | A1 (RJ11)      | 35         | 12-bit ADC, 10k pull-up to 3.3V |
-| BME280        | Qwiic I2C      | 21/22      | I2C address 0x77 |
+| BME680        | Qwiic I2C (aux box) | 21/22 | I2C address 0x76 (address pad soldered) |
+| PMSA003I      | Qwiic I2C (aux box) | 21/22 | I2C address 0x12; SET not wired, fan always on |
+| BME280        | Qwiic I2C      | 21/22      | I2C address 0x77, on the carrier; no longer read |
 | Charger V_BAT | A0 (soil SIG)  | 34         | 12-bit ADC, battery through a 4.7k/10k divider on the charger |
 | Charger DONE  | G0 (soil PWR)  | 15         | digital, low = battery full |
 | Charger CHRG  | PWM0 (header)  | 13         | digital, low = charging |
@@ -123,9 +125,9 @@ Boot prints `cpu: 80 MHz`.
 ## Serial output and commands (115200 baud)
 
 - `report ...` every five minutes (ADR 0001 cadence): reading ID, UTC time,
-  rain, wind, vane direction, BME280 fields, battery and charge state, and
+  rain, wind, vane direction, BME680 and PMSA003I fields, battery and charge state, and
   RSSI (see docs/sensors.md). Invalid sensor states print explicitly
-  (`bme280=error`, `wind_dir_deg=unknown`, `batt_v=unknown`,
+  (`bme680=error`, `pmsa003i=error`, `wind_dir_deg=unknown`, `batt_v=unknown`,
   `time=unsynced`) instead of fabricated values.
 - `upload: id=... ok (201) queued=N` as each reading is delivered, oldest
   first. `200` means the server already had that reading (a retry after a

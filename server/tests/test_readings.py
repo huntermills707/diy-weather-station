@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
-from conftest import make_reading, stored_rows
+from conftest import make_aq_reading, make_reading, stored_rows
 from fastapi.testclient import TestClient
 
 from weather_station_server import db
@@ -52,6 +52,35 @@ def test_unsynced_clock_and_failed_sensors_store_nulls(
     for column in ("device_time", "wind_dir_deg", "temp_c", "rh_pct", "press_hpa", "rssi_dbm"):
         assert row[column] is None
     assert row["bme280"] == "error"
+
+
+def test_air_quality_reading_is_stored(client: TestClient, auth: dict, db_path: Path) -> None:
+    response = client.post("/readings", json=make_aq_reading(), headers=auth)
+
+    assert response.status_code == 201
+    [row] = stored_rows(db_path)
+    assert row["bme280"] is None
+    assert (row["bme680"], row["temp_c"], row["gas_kohm"]) == ("ok", 18.42, 152.3)
+    assert (row["pmsa003i"], row["pm25_ugm3"], row["particles_03um"]) == ("ok", 3.4, 612.5)
+
+
+def test_failed_air_quality_sensors_store_nulls(
+    client: TestClient, auth: dict, db_path: Path
+) -> None:
+    reading = make_aq_reading(
+        bme680="error", temp_c=None, rh_pct=None, press_hpa=None, gas_kohm=None, pmsa003i="error"
+    )
+    for name in reading:
+        if name.startswith(("pm", "particles_")) and name != "pmsa003i":
+            reading[name] = None
+    assert client.post("/readings", json=reading, headers=auth).status_code == 201
+    [row] = stored_rows(db_path)
+    assert (row["bme680"], row["pmsa003i"], row["temp_c"], row["pm25_ugm3"]) == (
+        "error",
+        "error",
+        None,
+        None,
+    )
 
 
 # --- Authentication -------------------------------------------------------
@@ -113,6 +142,45 @@ def test_invalid_values_are_rejected(
     response = client.post("/readings", json=make_reading(**overrides), headers=auth)
     assert response.status_code == 422
     assert stored_rows(db_path) == []
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"bme280": "ok"},  # both climate sensor statuses
+        {"bme680": "broken"},
+        {"bme680": "ok", "temp_c": None},  # ok but missing a value
+        {"bme680": "error", "temp_c": None, "rh_pct": None, "press_hpa": None},  # gas present
+        {"pmsa003i": "error"},  # error but values present
+        {"pmsa003i": None},  # values without a status
+        {"pm25_ugm3": -1.0},
+        {"particles_03um": 70000.0},
+    ],
+)
+def test_invalid_air_quality_values_are_rejected(
+    client: TestClient, auth: dict, db_path: Path, overrides: dict
+) -> None:
+    response = client.post("/readings", json=make_aq_reading(**overrides), headers=auth)
+    assert response.status_code == 422
+    assert stored_rows(db_path) == []
+
+
+def test_reading_without_climate_status_is_rejected(client: TestClient, auth: dict) -> None:
+    reading = make_reading()
+    del reading["bme280"]
+    assert client.post("/readings", json=reading, headers=auth).status_code == 422
+
+
+def test_bme680_ok_without_gas_is_stored(client: TestClient, auth: dict, db_path: Path) -> None:
+    """An unstable heater costs only the gas value."""
+    response = client.post("/readings", json=make_aq_reading(gas_kohm=None), headers=auth)
+    assert response.status_code == 201
+    assert stored_rows(db_path)[0]["temp_c"] == 18.42
+
+
+def test_gas_without_bme680_is_rejected(client: TestClient, auth: dict) -> None:
+    response = client.post("/readings", json=make_reading(gas_kohm=100.0), headers=auth)
+    assert response.status_code == 422
 
 
 def test_missing_field_is_rejected(client: TestClient, auth: dict, db_path: Path) -> None:

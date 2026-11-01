@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 
+#include "particulates.h"
+
 // One five-minute reading, as printed on serial and POSTed to the ingest
 // service. Field meanings and units: docs/ingest-api.md and docs/sensors.md.
 struct Reading {
@@ -15,10 +17,13 @@ struct Reading {
     float windAvgKmh;
     float windPeakKmh;
     float windDirDeg;    // < 0 when the vane is open or shorted
-    const char* bme280;  // "ok", "implausible", or "error"
-    float tempC;         // these three are valid only when bme280 is "ok"
+    const char* bme680;  // "ok", "implausible", or "error"
+    float tempC;         // these three are valid only when bme680 is "ok"
     float rhPct;
     float pressHpa;
+    float gasKohm;         // < 0 when the gas heater was not stable; valid only when bme680 is "ok"
+    const char* pmsa003i;  // "ok" or "error" (no sample all window)
+    ParticulateWindow pm;  // valid only when pmsa003i is "ok"
     bool rssiValid;
     int rssiDbm;
     // Reboot and queue telemetry (JAE-60, JAE-62), fixed when the reading is

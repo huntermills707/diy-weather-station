@@ -12,15 +12,16 @@ from datetime import UTC, datetime
 from weather_station_server import quality
 from weather_station_server.models import Reading, ReadingReceipt
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # A reading's time: the station's clock, or the server's while the station
 # was unsynced (docs/database.md). Written exactly as in the index below, so
 # SQLite can use the index for it.
 READING_TIME = "COALESCE(device_time, received_at)"
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS readings (
+# The readings table, under any name (the version 4 migration builds a copy).
+TABLE = """
+CREATE TABLE IF NOT EXISTS {name} (
     id            INTEGER PRIMARY KEY,
     station_id    TEXT    NOT NULL,
     reading_id    TEXT    NOT NULL,
@@ -36,7 +37,7 @@ CREATE TABLE IF NOT EXISTS readings (
     temp_c        REAL,
     rh_pct        REAL,
     press_hpa     REAL,
-    bme280        TEXT    NOT NULL,
+    bme280        TEXT,
     rssi_dbm      INTEGER,
     boot_count    INTEGER,
     reset_reason  TEXT,
@@ -44,14 +45,32 @@ CREATE TABLE IF NOT EXISTS readings (
     quality       TEXT    NOT NULL DEFAULT '',
     batt_v        REAL,
     charge_state  TEXT,
+    bme680        TEXT,
+    gas_kohm      REAL,
+    pmsa003i      TEXT,
+    pm1_ugm3      REAL,
+    pm25_ugm3     REAL,
+    pm10_ugm3     REAL,
+    particles_03um  REAL,
+    particles_05um  REAL,
+    particles_1um   REAL,
+    particles_25um  REAL,
+    particles_5um   REAL,
+    particles_10um  REAL,
     UNIQUE (station_id, reading_id)
 );
+"""
+
+SCHEMA = (
+    TABLE.format(name="readings")
+    + """
 CREATE INDEX IF NOT EXISTS readings_station_time ON readings (station_id, received_at);
 -- Reading time (docs/database.md): the read API's range queries search this
 -- index instead of scanning every row.
 CREATE INDEX IF NOT EXISTS readings_station_reading_time
     ON readings (station_id, COALESCE(device_time, received_at));
 """
+)
 
 # Version 1 to 2 (M4): reboot and queue telemetry, and data-quality flags.
 MIGRATE_V1 = (
@@ -66,6 +85,20 @@ MIGRATE_V2 = (
     "ALTER TABLE readings ADD COLUMN batt_v REAL",
     "ALTER TABLE readings ADD COLUMN charge_state TEXT",
 )
+
+
+def migrate_v3(conn: sqlite3.Connection) -> None:
+    """Version 3 to 4 (JAE-74): air-quality columns, and a nullable bme280.
+
+    SQLite cannot drop NOT NULL from a column, so the table is copied into a
+    new one; the caller's executescript(SCHEMA) then recreates the indexes.
+    """
+    columns = ", ".join(row[1] for row in conn.execute("PRAGMA table_info(readings)"))
+    conn.execute(TABLE.format(name="readings_v4"))
+    conn.execute(f"INSERT INTO readings_v4 ({columns}) SELECT {columns} FROM readings")
+    conn.execute("DROP TABLE readings")
+    conn.execute("ALTER TABLE readings_v4 RENAME TO readings")
+
 
 # Payload fields stored as-is, in column order (device_time is converted).
 _COLUMNS = [name for name in Reading.model_fields]
@@ -95,14 +128,16 @@ def init_db(path: str) -> None:
         # read-only users such as Grafana could not open the database. At one
         # write per five minutes, WAL's concurrency gain doesn't matter.
         conn.execute("PRAGMA journal_mode=DELETE")
-        if version in (1, 2):
+        if version in (1, 2, 3):
             conn.execute("BEGIN")
             if version == 1:
                 for statement in MIGRATE_V1:
                     conn.execute(statement)
                 reflag(conn)
-            for statement in MIGRATE_V2:
-                conn.execute(statement)
+            if version in (1, 2):
+                for statement in MIGRATE_V2:
+                    conn.execute(statement)
+            migrate_v3(conn)
             conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             conn.commit()
         conn.executescript(SCHEMA)

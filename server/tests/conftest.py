@@ -59,6 +59,27 @@ def make_reading(**overrides: Any) -> dict[str, Any]:
     return reading
 
 
+def make_aq_reading(**overrides: Any) -> dict[str, Any]:
+    """A valid payload from firmware with the BME680 and PMSA003I (JAE-74)."""
+    reading = make_reading(
+        bme680="ok",
+        gas_kohm=152.3,
+        pmsa003i="ok",
+        pm1_ugm3=2.1,
+        pm25_ugm3=3.4,
+        pm10_ugm3=4.0,
+        particles_03um=612.5,
+        particles_05um=180.2,
+        particles_1um=24.0,
+        particles_25um=1.5,
+        particles_5um=0.3,
+        particles_10um=0.0,
+    )
+    del reading["bme280"]
+    reading.update(overrides)
+    return reading
+
+
 def stored_rows(path: Path) -> list[sqlite3.Row]:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row

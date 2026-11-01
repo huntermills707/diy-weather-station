@@ -49,7 +49,7 @@ void uploadQueuePoll() {
         formatUtcAt(r.uptimeMs, r.deviceTime, sizeof(r.deviceTime));
     }
 
-    char json[640];
+    char json[1024];
     if (!readingToJson(r, station, json, sizeof(json))) {
         Serial.printf("upload: id=%s DROPPED payload too large\n", r.readingId);
         rejected++;

@@ -38,20 +38,25 @@ that has no valid number. The station sends `null` and never a fake value.
 | `wind_avg_kmh` | number | 0-500 | Average wind speed over the window |
 | `wind_peak_kmh` | number | 0-500 | Gust: the shortest gap between two closures |
 | `wind_dir_deg` | number or null | 0 ≤ x < 360 | Vane heading. `null` = vane open or shorted |
-| `temp_c` | number or null | -40 to 85 | BME280 temperature |
-| `rh_pct` | number or null | 0-100 | BME280 relative humidity |
-| `press_hpa` | number or null | 300-1100 | BME280 station pressure |
-| `bme280` | string | `ok`, `implausible`, `error` | Sensor status. The three BME280 numbers must be present exactly when this is `ok` |
+| `temp_c` | number or null | -40 to 85 | Temperature |
+| `rh_pct` | number or null | 0-100 | Relative humidity |
+| `press_hpa` | number or null | 300-1100 | Station pressure |
+| `bme680` | string | `ok`, `implausible`, `error` | Status of the BME680, the source of the three numbers above since JAE-74. They must be present exactly when this is `ok` |
+| `bme280` | string | `ok`, `implausible`, `error` | The same, from firmware before JAE-74, which read the BME280. Send exactly one of `bme280` and `bme680` |
 | `rssi_dbm` | integer or null | -127 to 0 | WiFi signal strength when the reading was taken |
 | `boot_count` | integer, optional | ≥ 0 | Station boots since flashing, kept in flash. Diagnoses resets |
 | `reset_reason` | string, optional | 1-32 chars, `[a-z_]` | Why the station last booted: `power_on`, `external`, `software`, `panic`, `task_watchdog`, `int_watchdog`, `watchdog`, `brownout`, `deep_sleep`, `unknown` |
 | `queue_dropped` | integer, optional | ≥ 0 | Readings the station dropped since boot because its upload queue was full |
 | `batt_v` | number or null, optional | 0-5 | Battery voltage from the solar charger. `null` = reading out of range (wire off) |
 | `charge_state` | string, optional | `charging`, `full`, `idle`, `unknown` | Solar charger status. `idle` = no solar input. Current firmware never sends `unknown`; early JAE-73 bench firmware did |
+| `gas_kohm` | number or null, optional | 0-100000 | BME680 gas resistance. May be `null` with `bme680` `ok` (heater not at temperature); must be `null` otherwise |
+| `pmsa003i` | string, optional | `ok`, `implausible`, `error` | Particulate sensor status. The nine numbers below must be present exactly when this is `ok` |
+| `pm1_ugm3`, `pm25_ugm3`, `pm10_ugm3` | number or null, optional | 0-10000 | PM1.0, PM2.5 and PM10 mass concentration, window average |
+| `particles_03um`, `particles_05um`, `particles_1um`, `particles_25um`, `particles_5um`, `particles_10um` | number or null, optional | 0-65535 | Particles above 0.3 … 10 µm per 0.1 L of air, window average |
 
 `boot_count`, `reset_reason` and `queue_dropped` arrived with M4, and
-`batt_v` and `charge_state` with JAE-73. Older firmware omits them and they
-are stored as `NULL`.
+`batt_v` and `charge_state` with JAE-73, and the air-quality fields with
+JAE-74. Older firmware omits them and they are stored as `NULL`.
 
 Unknown fields are rejected, so a typo cannot silently drop data.
 
@@ -72,7 +77,18 @@ Example:
   "temp_c": 18.42,
   "rh_pct": 61.5,
   "press_hpa": 1004.2,
-  "bme280": "ok",
+  "bme680": "ok",
+  "gas_kohm": 152.3,
+  "pmsa003i": "ok",
+  "pm1_ugm3": 2.1,
+  "pm25_ugm3": 3.4,
+  "pm10_ugm3": 4.0,
+  "particles_03um": 612.5,
+  "particles_05um": 180.2,
+  "particles_1um": 24.0,
+  "particles_25um": 1.5,
+  "particles_5um": 0.3,
+  "particles_10um": 0.0,
   "rssi_dbm": -63
 }
 ```

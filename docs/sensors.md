@@ -9,6 +9,12 @@ SparkFun's
 [Weather Carrier examples](https://github.com/sparkfun/MicroMod_Weather_Carrier_Board).
 Measurements are meant to be reasonable, not lab grade.
 
+Temperature, humidity, pressure and air quality come from an auxiliary box
+on the carrier's Qwiic cable (JAE-74): an Adafruit BME680 (#3660, address
+pad soldered for 0x76) and an Adafruit PMSA003I (#4632, 0x12). The
+carrier's own BME280 (0x77) is still on the bus but no longer read. The
+`i` serial command lists what answers on the bus.
+
 Lightning (AS3935) is out of scope (ADR 0001) and soil moisture has been
 dropped from the project; neither is read.
 
@@ -32,10 +38,15 @@ script (`scripts/serial_capture.py`) prefixes every line with host UTC time.
 | `wind_avg_kmh` | km/h | Anemometer | Closures in the window ÷ window seconds × `WIND_KMH_PER_HZ` |
 | `wind_peak_kmh` | km/h | Anemometer | Shortest gap between two closures in the window; equals the average with fewer than two closures |
 | `wind_dir_deg` | degrees | Wind vane | Closest `VANE_ADC` entry + `VANE_OFFSET_DEG`; `unknown` when the vane reads open circuit (unplugged) or shorted to ground |
-| `temp_c` | °C | BME280 | Library read |
-| `rh_pct` | % RH | BME280 | Library read |
-| `press_hpa` | hPa | BME280 | Station pressure (not sea-level corrected) |
-| `bme280` | — | BME280 | `ok`, `implausible` (out-of-range values suppressed), or `error` (no I2C response; retried each report) |
+| `temp_c` | °C | BME680 | One forced measurement at report time (Adafruit library) |
+| `rh_pct` | % RH | BME680 | Same measurement |
+| `press_hpa` | hPa | BME680 | Station pressure (not sea-level corrected) |
+| `gas_kohm` | kΩ | BME680 | Gas (VOC) sensor resistance, heater at 320 °C for 150 ms. Lower means more VOCs; a trend, not a calibrated value. `unknown` when the heater did not reach temperature |
+| `bme680` | — | BME680 | `ok`, `implausible` (out-of-range values suppressed), or `error` (no I2C response; retried each report) |
+| `pm1` / `pm25` / `pm10` | µg/m³ | PMSA003I | PM1.0, PM2.5 and PM10 mass ("environmental" values), averaged over the window. Sent as `pm1_ugm3`, `pm25_ugm3`, `pm10_ugm3` |
+| `pm_samples` | count | PMSA003I | Samples averaged: one every 10 s, so ~30 per window. Serial only |
+| — | per 0.1 L | PMSA003I | Particles above 0.3, 0.5, 1, 2.5, 5 and 10 µm, averaged over the window. Sent only, as `particles_03um` … `particles_10um` |
+| `pmsa003i` | — | PMSA003I | `ok`, or `error` (not one good sample in the window; the sensor is probed again every 10 s) |
 | `batt_v` | V | Charger V_BAT | 16 calibrated ADC reads × `BATT_DIVIDER_RATIO`; `unknown` outside 2.5-4.5 V (wire off) |
 | `charge` | — | Charger CHRG/DONE | `charging` (only CHRG low), `full` (only DONE low), or `idle` (no solar input, e.g. night: the charger powers its status pull-ups from the panel, so both lines read low). Sent as `charge_state` |
 | `rssi_dbm` | dBm | WiFi | Signal strength; omitted while WiFi is down |
@@ -55,6 +66,14 @@ Invalid states print explicitly rather than as made-up numbers.
 Fixed sampling behaviour (in `weather_meters.cpp`, not expected to change):
 rain debounce 100 ms (bench-measured settle edges at 18-34 ms after a tip),
 wind debounce 5 ms, vane averaged over 8 ADC reads.
+
+Air quality (in `particulates.cpp` and `firmware.ino`): the PMSA003I is
+sampled every 10 s, starting 30 s after boot (its warm-up), and its fan
+runs all the time (about 100 mA) because the SET sleep pin is not wired.
+The BME680 gas heater runs only for each five-minute measurement, so its
+self-heating of the temperature reading is negligible. No IAQ index is
+computed (Bosch's BSEC library is closed source); an air quality index from
+PM2.5 belongs on the server.
 
 ## Field calibration (once, after mounting)
 

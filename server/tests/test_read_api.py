@@ -101,6 +101,17 @@ def test_current_failed_sensor_gives_unavailable_metrics(
     assert body["health"]["bme280"] == "error"
 
 
+def test_current_reports_air_quality_sensors(
+    client: TestClient, db_path: Path, now: datetime
+) -> None:
+    insert(db_path, now, bme280=None, bme680="ok", gas_kohm=150.0, pmsa003i="ok", pm25_ugm3=3.4)
+    body = client.get("/api/current").json()
+    assert body["reading"]["gas_kohm"] == 150.0
+    assert body["reading"]["pm25_ugm3"] == 3.4
+    assert body["health"]["bme280"] is None
+    assert (body["health"]["bme680"], body["health"]["pmsa003i"]) == ("ok", "ok")
+
+
 def test_current_health_fresh_and_stale(client: TestClient, db_path: Path, now: datetime) -> None:
     insert(db_path, now - timedelta(minutes=3))
     health = client.get("/api/current").json()["health"]
