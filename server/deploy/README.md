@@ -281,9 +281,10 @@ Grafana asks for a new password. Open the **Weather station** dashboard. Like
 port 8000, port 3000 must stay LAN-only.
 
 The dashboard shows temperature, humidity, pressure, wind, rain, the minutes
-between readings, and a table of the latest rows. Missing readings break the
-lines. A sensor error stored as NULL also leaves a gap. The interval panel
-shows a gap as a spike above 5 minutes. To check a point against the
+between readings, particulates (PM2.5, PM10), VOC gas resistance, and a
+table of the latest rows. Missing readings break the lines. A sensor error
+stored as NULL also leaves a gap. The interval panel shows a gap as a spike
+above 5 minutes. To check a point against the
 database, compare it with the table, or query the row with `sqlite3`.
 Chart times use the station's NTP time (`device_time`), falling back to the
 server's `received_at`, and display in the browser's time zone.

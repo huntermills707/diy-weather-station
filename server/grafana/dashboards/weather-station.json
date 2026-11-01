@@ -341,6 +341,114 @@
       "id": 6
     },
     {
+      "type": "timeseries",
+      "title": "Particulates (PMSA003I)",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "weather-station-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "weather-station-sqlite"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, pm25_ugm3 AS \"PM2.5\", pm10_ugm3 AS \"PM10\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "queryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, pm25_ugm3 AS \"PM2.5\", pm10_ugm3 AS \"PM10\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "conμgm3",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "insertNulls": 600000
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 8
+    },
+    {
+      "type": "timeseries",
+      "title": "VOC gas sensor resistance (BME680; higher is cleaner)",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "weather-station-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "weather-station-sqlite"
+          },
+          "queryType": "time series",
+          "rawQueryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, gas_kohm AS \"Gas\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "queryText": "SELECT unixepoch(COALESCE(device_time, received_at)) AS time, gas_kohm AS \"Gas\" FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY time",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kohm",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "insertNulls": 600000
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 9
+    },
+    {
       "type": "table",
       "title": "Latest readings",
       "datasource": {
@@ -349,7 +457,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 24,
+        "y": 32,
         "w": 24,
         "h": 10
       },
@@ -362,8 +470,8 @@
             "uid": "weather-station-sqlite"
           },
           "queryType": "table",
-          "rawQueryText": "SELECT id, reading_id, device_time, received_at, temp_c, rh_pct, press_hpa, wind_avg_kmh, wind_peak_kmh, wind_dir_deg, rain_mm, bme280, rssi_dbm FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY unixepoch(COALESCE(device_time, received_at)) DESC LIMIT 50",
-          "queryText": "SELECT id, reading_id, device_time, received_at, temp_c, rh_pct, press_hpa, wind_avg_kmh, wind_peak_kmh, wind_dir_deg, rain_mm, bme280, rssi_dbm FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY unixepoch(COALESCE(device_time, received_at)) DESC LIMIT 50",
+          "rawQueryText": "SELECT id, reading_id, device_time, received_at, temp_c, rh_pct, press_hpa, wind_avg_kmh, wind_peak_kmh, wind_dir_deg, rain_mm, gas_kohm, pm25_ugm3, pm10_ugm3, bme280, bme680, pmsa003i, rssi_dbm FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY unixepoch(COALESCE(device_time, received_at)) DESC LIMIT 50",
+          "queryText": "SELECT id, reading_id, device_time, received_at, temp_c, rh_pct, press_hpa, wind_avg_kmh, wind_peak_kmh, wind_dir_deg, rain_mm, gas_kohm, pm25_ugm3, pm10_ugm3, bme280, bme680, pmsa003i, rssi_dbm FROM readings WHERE unixepoch(COALESCE(device_time, received_at)) BETWEEN $__from / 1000 AND $__to / 1000 ORDER BY unixepoch(COALESCE(device_time, received_at)) DESC LIMIT 50",
           "timeColumns": []
         }
       ],

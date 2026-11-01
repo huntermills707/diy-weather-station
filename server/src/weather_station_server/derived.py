@@ -63,3 +63,32 @@ def sea_level_pressure_hpa(
         return None
     lapse = 0.0065 * altitude_m
     return press_hpa * (1 - lapse / (temp_c + lapse + 273.15)) ** -5.257
+
+
+# US EPA AQI breakpoints for PM2.5 (2024 revision): concentration range in
+# ug/m3 (truncated to 0.1), index range, and category.
+AQI_PM25 = (
+    (0.0, 9.0, 0, 50, "Good"),
+    (9.1, 35.4, 51, 100, "Moderate"),
+    (35.5, 55.4, 101, 150, "Unhealthy for sensitive groups"),
+    (55.5, 125.4, 151, 200, "Unhealthy"),
+    (125.5, 225.4, 201, 300, "Very unhealthy"),
+    (225.5, 325.4, 301, 500, "Hazardous"),
+)
+
+
+def aqi_pm25(pm25_ugm3: float | None) -> tuple[int, str] | None:
+    """US EPA air quality index and category for a PM2.5 concentration.
+
+    The EPA computes the index from a 24-hour (or NowCast) average; this
+    applies the same scale to whatever average it is given. Above the top
+    of the scale the index stays at 500.
+    """
+    if pm25_ugm3 is None:
+        return None
+    # Truncate as the EPA does; round first so 35.4 isn't stored as 35.39999.
+    c = math.floor(round(pm25_ugm3 * 10, 6)) / 10
+    for c_lo, c_hi, i_lo, i_hi, category in AQI_PM25:
+        if c <= c_hi:
+            return round(i_lo + (i_hi - i_lo) * (c - c_lo) / (c_hi - c_lo)), category
+    return 500, AQI_PM25[-1][4]
