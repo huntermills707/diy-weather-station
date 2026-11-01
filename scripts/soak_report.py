@@ -100,8 +100,11 @@ def main() -> int:
     for r in unsynced:
         anomalies.append((when(r), f"{r['reading_id']}: station clock not NTP-synced"))
     for r in rows:
-        if r["bme280"] != "ok":
-            anomalies.append((when(r), f"{r['reading_id']}: bme280={r['bme280']}"))
+        # Climate sensor: the BME280 until JAE-74, the BME680 since.
+        sensors = ("bme680", "pmsa003i") if r["bme680"] is not None else ("bme280",)
+        for sensor in sensors:
+            if r[sensor] != "ok":
+                anomalies.append((when(r), f"{r['reading_id']}: {sensor}={r[sensor]}"))
         if r["wind_dir_deg"] is None:
             anomalies.append((when(r), f"{r['reading_id']}: wind vane unknown"))
 

@@ -1,11 +1,12 @@
+#include <Adafruit_BME680.h>
 #include <Arduino.h>
 #include <Preferences.h>
-#include <SparkFunBME280.h>
 #include <Wire.h>
 #include <esp_random.h>
 #include <esp_task_wdt.h>
 
 #include "network.h"
+#include "particulates.h"
 #include "power.h"
 #include "reading.h"
 #include "upload_queue.h"
@@ -28,8 +29,13 @@ constexpr uint32_t WATCHDOG_TIMEOUT_S = 30;
 // 80 MHz (the lowest that keeps WiFi) cuts that versus the 240 MHz default.
 constexpr uint32_t CPU_FREQ_MHZ = 80;
 
-BME280 bme280;
-bool bme280Ok = false;
+// The BME680 in the auxiliary box (JAE-74) gives temperature, humidity,
+// pressure and gas. Its address pad is soldered for 0x76, clear of the
+// carrier's own BME280 at 0x77, which is no longer read.
+constexpr uint8_t BME680_ADDR = 0x76;
+
+Adafruit_BME680 bme680(&Wire);
+bool bme680Ok = false;
 bool calMode = false;
 
 // reading_id = "<bootId>-<readingSeq>": random per boot, counting per reading,
@@ -48,10 +54,18 @@ uint32_t nextCalPrintAt = 0;
 uint32_t lastRainSeen = 0;
 uint32_t lastWindSeen = 0;
 
-static void beginBme280() {
-    // Carrier BME280 sits at I2C address 0x77 (the library default).
-    bme280Ok = bme280.beginI2C(Wire);
-    Serial.println(bme280Ok ? "bme280: ready" : "bme280: ERROR no response at 0x77");
+static void beginBme680() {
+    bme680Ok = bme680.begin(BME680_ADDR);
+    if (bme680Ok) {
+        // Adafruit's example settings. The gas heater runs only during each
+        // five-minute measurement, so it barely warms the temperature reading.
+        bme680.setTemperatureOversampling(BME680_OS_8X);
+        bme680.setHumidityOversampling(BME680_OS_2X);
+        bme680.setPressureOversampling(BME680_OS_4X);
+        bme680.setIIRFilterSize(BME680_FILTER_SIZE_3);
+        bme680.setGasHeater(320, 150);  // 320 C for 150 ms
+    }
+    Serial.println(bme680Ok ? "bme680: ready" : "bme680: ERROR no response at 0x76");
 }
 
 static const char* resetReasonText(esp_reset_reason_t reason) {
@@ -119,16 +133,23 @@ static Reading takeReading() {
         w.windMinIntervalMs > 0 ? WIND_KMH_PER_HZ * 1000.0f / w.windMinIntervalMs : r.windAvgKmh;
     r.windDirDeg = windDirectionDeg(windDirectionRawAdc());
 
-    if (!bme280Ok) {
-        beginBme280();  // retry a sensor that failed at boot
+    if (!bme680Ok) {
+        beginBme680();  // retry a sensor that failed at boot
     }
-    r.bme280 = "error";
-    if (bme280Ok) {
-        r.tempC = bme280.readTempC();
-        r.pressHpa = bme280.readFloatPressure() / 100.0f;
-        r.rhPct = bme280.readFloatHumidity();
-        r.bme280 = plausible(r.tempC, r.pressHpa * 100.0f, r.rhPct) ? "ok" : "implausible";
+    r.bme680 = "error";
+    if (bme680Ok && bme680.performReading()) {
+        r.tempC = bme680.temperature;
+        r.pressHpa = bme680.pressure / 100.0f;
+        r.rhPct = bme680.humidity;
+        // The library reports 0 when the heater did not reach temperature.
+        r.gasKohm = bme680.gas_resistance > 0 ? bme680.gas_resistance / 1000.0f : -1.0f;
+        r.bme680 = plausible(r.tempC, r.pressHpa * 100.0f, r.rhPct) ? "ok" : "implausible";
+    } else {
+        bme680Ok = false;  // e.g. the auxiliary box's cable: probe afresh next time
     }
+
+    r.pm = particulatesTakeWindow();
+    r.pmsa003i = r.pm.samples > 0 ? "ok" : "error";
 
     r.rssiValid = networkConnected();
     r.rssiDbm = r.rssiValid ? networkRssi() : 0;
@@ -153,10 +174,20 @@ static void printReading(const Reading& r) {
     } else {
         Serial.print("wind_dir_deg=unknown ");
     }
-    if (strcmp(r.bme280, "ok") == 0) {
+    if (strcmp(r.bme680, "ok") == 0) {
         Serial.printf("temp_c=%.2f rh_pct=%.1f press_hpa=%.1f ", r.tempC, r.rhPct, r.pressHpa);
+        if (r.gasKohm >= 0.0f) {
+            Serial.printf("gas_kohm=%.1f ", r.gasKohm);
+        } else {
+            Serial.print("gas_kohm=unknown ");
+        }
     }
-    Serial.printf("bme280=%s ", r.bme280);
+    Serial.printf("bme680=%s ", r.bme680);
+    if (strcmp(r.pmsa003i, "ok") == 0) {
+        Serial.printf("pm1=%.1f pm25=%.1f pm10=%.1f pm_samples=%lu ", r.pm.pm1Ugm3, r.pm.pm25Ugm3,
+                      r.pm.pm10Ugm3, (unsigned long)r.pm.samples);
+    }
+    Serial.printf("pmsa003i=%s ", r.pmsa003i);
     if (r.battV >= 0.0f) {
         Serial.printf("batt_v=%.2f ", r.battV);
     } else {
@@ -246,7 +277,8 @@ void setup() {
     printHelp();
 
     Wire.begin();
-    beginBme280();
+    beginBme680();
+    particulatesInit();
     weatherMetersInit();
     powerInit();
 
@@ -269,6 +301,7 @@ void loop() {
     handleSerial();
     networkPoll();
     uploadQueuePoll();
+    particulatesPoll();
 
     uint32_t rainNow = rainTipsTotal();
     if (rainNow != lastRainSeen) {

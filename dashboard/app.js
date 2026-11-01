@@ -277,7 +277,7 @@ function renderConditions(data) {
   const sensorReason = {
     implausible: "Sensor reading out of range",
     error: "Sensor not responding",
-  }[r.bme280];
+  }[r.bme680 ?? r.bme280];
 
   const tempUnit = unitOf("temp");
   setValue("temp", convert("temp", r.temp_c), 1, tempUnit);
@@ -389,7 +389,8 @@ function renderHealth(data) {
       h.clock_synced ? "" : "warn",
     ],
     ["WiFi signal", signal, signalClass],
-    ["BME280 sensor", ...sensor[h.bme280]],
+    // The BME680 replaced the BME280 for temperature, humidity and pressure (JAE-74).
+    h.bme680 ? ["BME680 sensor", ...sensor[h.bme680]] : ["BME280 sensor", ...sensor[h.bme280]],
     [
       "Data quality, last 24 h",
       h.flagged_24h ? `${h.flagged_24h} ${plural(h.flagged_24h, "reading")} flagged` : "None flagged",

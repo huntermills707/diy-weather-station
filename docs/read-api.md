@@ -64,13 +64,25 @@ The latest reading, with derived metrics, rain totals, and station health.
     "temp_c": 30.73,
     "rh_pct": 35.7,
     "press_hpa": 1005.1,
-    "bme280": "ok",
+    "bme280": null,
+    "bme680": "ok",
     "rssi_dbm": -66,
     "boot_count": 12,
     "reset_reason": "power_on",
     "queue_dropped": 0,
     "batt_v": 4.07,
     "charge_state": "charging",
+    "gas_kohm": 152.3,
+    "pmsa003i": "ok",
+    "pm1_ugm3": 2.1,
+    "pm25_ugm3": 3.4,
+    "pm10_ugm3": 4.0,
+    "particles_03um": 612.5,
+    "particles_05um": 180.2,
+    "particles_1um": 24.0,
+    "particles_25um": 1.5,
+    "particles_5um": 0.3,
+    "particles_10um": 0.0,
     "quality": []
   },
   "derived": {
@@ -93,7 +105,9 @@ The latest reading, with derived metrics, rain totals, and station health.
     "clock_synced": true,
     "clock_offset_s": 0.9,
     "rssi_dbm": -66,
-    "bme280": "ok"
+    "bme280": null,
+    "bme680": "ok",
+    "pmsa003i": "ok"
   }
 }
 ```
@@ -143,7 +157,7 @@ five minutes of rain can land on the wrong side of midnight.
 ### Derived metrics
 
 Every derived value is `null` when any of its inputs is `null` (for example
-`bme280` is `error`) or [flagged](data-quality.md), so a failed sensor never
+`bme680` is `error`) or [flagged](data-quality.md), so a failed sensor never
 produces a made-up number.
 Code: `server/src/weather_station_server/derived.py`.
 

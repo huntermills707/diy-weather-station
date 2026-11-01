@@ -177,6 +177,37 @@ def test_migration_from_v2_adds_charger_columns(db_path: Path) -> None:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
 
 
+def test_migration_from_v3_keeps_rows_and_allows_null_bme280(db_path: Path) -> None:
+    v3_schema = (
+        db.SCHEMA.split("    bme680")[0].replace("bme280        TEXT,", "bme280 TEXT NOT NULL,")
+        + "    UNIQUE (station_id, reading_id)\n);"
+    )
+    conn = sqlite3.connect(db_path)
+    conn.executescript(v3_schema)
+    conn.execute("PRAGMA user_version = 3")
+    conn.execute(
+        "INSERT INTO readings (station_id, reading_id, received_at, uptime_ms, window_s, "
+        "rain_tips, rain_mm, wind_avg_kmh, wind_peak_kmh, temp_c, bme280, quality, batt_v) "
+        "VALUES ('station-1', 'old-0', ?, 0, 300, 0, 0, 0, 0, 18.5, 'ok', 'kept', 3.9)",
+        (utc_text(START),),
+    )
+    conn.commit()
+    conn.close()
+
+    db.init_db(str(db_path))
+
+    [row] = stored_rows(db_path)
+    assert (row["temp_c"], row["bme280"], row["quality"]) == (18.5, "ok", "kept")
+    assert row["batt_v"] == 3.9
+    assert (row["bme680"], row["pm25_ugm3"]) == (None, None)
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
+        notnull = {r[1]: r[3] for r in conn.execute("PRAGMA table_info(readings)")}
+        assert notnull["bme280"] == 0
+        indexes = {r[1] for r in conn.execute("PRAGMA index_list(readings)")}
+        assert {"readings_station_time", "readings_station_reading_time"} <= indexes
+
+
 # --- Read API ----------------------------------------------------------------
 
 
