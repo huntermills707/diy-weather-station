@@ -190,10 +190,6 @@ h3 {
   min-width: 0;
 }
 
-#card-wind {
-  grid-column: span 2;
-}
-
 .stale-data .card .value {
   color: var(--muted);
 }
@@ -227,16 +223,20 @@ h3 {
   color: var(--warn);
 }
 
-.wind-now {
+/* The wind card is the same size as the others: its compass sits beside the
+   heading, clear of the value so a wide reading never runs into it. */
+.card-head {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .compass {
-  width: 64px;
-  height: 64px;
+  width: 40px;
+  height: 40px;
   flex: none;
+  margin: -2px -2px -4px 0;
 }
 
 .compass-ring {
@@ -247,7 +247,7 @@ h3 {
 
 .compass-label {
   fill: var(--muted);
-  font-size: 13px;
+  font-size: 18px;
   text-anchor: middle;
   dominant-baseline: middle;
 }
