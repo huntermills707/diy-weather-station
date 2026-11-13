@@ -26,7 +26,7 @@ def test_serves_dashboard_without_lan_links(public_client: TestClient) -> None:
     for path in ("/", "/index.html"):
         response = public_client.get(path)
         assert response.status_code == 200
-        assert "<title>Weather station</title>" in response.text
+        assert "<title>Volundarhus Weather: Santa Rosa, CA</title>" in response.text
         assert "/docs" not in response.text
         assert "grafana" not in response.text.lower()
     assert public_client.get("/app.js").status_code == 200
