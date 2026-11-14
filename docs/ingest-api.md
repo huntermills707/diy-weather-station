@@ -50,7 +50,7 @@ that has no valid number. The station sends `null` and never a fake value.
 | `batt_v` | number or null, optional | 0-5 | Battery voltage from the solar charger. `null` = reading out of range (wire off) |
 | `charge_state` | string, optional | `charging`, `full`, `idle`, `unknown` | Solar charger status. `idle` = no solar input. Current firmware never sends `unknown`; early JAE-73 bench firmware did |
 | `gas_kohm` | number or null, optional | 0-100000 | BME680 gas resistance. May be `null` with `bme680` `ok` (heater not at temperature); must be `null` otherwise |
-| `pmsa003i` | string, optional | `ok`, `implausible`, `error` | Particulate sensor status. The nine numbers below must be present exactly when this is `ok` |
+| `pmsa003i` | string, optional | `ok`, `implausible`, `error` | Particulate sensor status. The nine numbers below must be present exactly when this is `ok`. The station sends null when the window closed before the sensor was read (JAE-81) |
 | `pm1_ugm3`, `pm25_ugm3`, `pm10_ugm3` | number or null, optional | 0-10000 | PM1.0, PM2.5 and PM10 mass concentration, window average |
 | `particles_03um`, `particles_05um`, `particles_1um`, `particles_25um`, `particles_5um`, `particles_10um` | number or null, optional | 0-65535 | Particles above 0.3 … 10 µm per 0.1 L of air, window average |
 

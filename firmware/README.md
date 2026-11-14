@@ -81,7 +81,8 @@ cp firmware/secrets.example.h firmware/secrets.h
 | Anemometer    | D0 (RJ11)      | 14         | digital, falling-edge interrupt |
 | Wind vane     | A1 (RJ11)      | 35         | 12-bit ADC, 10k pull-up to 3.3V |
 | BME680        | Qwiic I2C (aux box) | 21/22 | I2C address 0x76 (address pad soldered) |
-| PMSA003I      | Qwiic I2C (aux box) | 21/22 | I2C address 0x12; SET not wired, fan always on |
+| PMSA003I      | Qwiic I2C (aux box) | 21/22 | I2C address 0x12 |
+| PMSA003I SET  | RX1 (bottom header) | 16 | digital out, high = run, low = sleep; 330 ohm pull-down at the breakout (JAE-81) |
 | BME280        | Qwiic I2C      | 21/22      | I2C address 0x77, on the carrier; no longer read |
 | Charger V_BAT | A0 (soil SIG)  | 34         | 12-bit ADC, battery through a 4.7k/10k divider on the charger |
 | Charger DONE  | G0 (soil PWR)  | 15         | digital, low = battery full |
@@ -122,13 +123,41 @@ CPU draws full power all the time and the clock sets most of that draw. WiFi
 modem sleep is already on: Arduino-ESP32 defaults to `WIFI_PS_MIN_MODEM`.
 Boot prints `cpu: 80 MHz`.
 
+**PMSA003I fan (JAE-81).** The fan draws about 100 mA, the largest draw
+firmware controls, so the sensor sleeps for most of each five-minute window.
+40 s before the window closes it wakes (`pmsa003i: wake (fan on)`), runs
+30 s to warm up and flush the chamber, then is read every 2 s for the last
+10 s (about 5 samples). The report averages those samples and the sensor
+sleeps again (`pmsa003i: sleep (fan off)`). The fan runs about 13% of the
+time. While it sleeps the sensor isn't read at all, so a sleeping sensor is
+never reported as an error. The SET pull-down keeps the fan off whenever the
+ESP32 isn't driving the pin: during reset, boot, and deep sleep. A watchdog
+reset during a burst also turns it off. Wiring:
+[hardware/README.md](../hardware/README.md#pmsa003i-fan-control-jae-81).
+
+**Low-battery shutoff (JAE-81).** On 2026-11-04 the battery ran flat and
+the ESP32 hung, still powered, until someone pressed reset, even after the
+panel had recharged the battery. So the station stops first. After two
+readings in a row below `BATT_SLEEP_V` (3.3 V, in `power.h`) it tries for
+up to 20 s to upload what is queued, then deep-sleeps with the fan off:
+`power: battery 3.28 V: deep sleep for 20 min (resumes at 3.60 V)`. It
+wakes every 20 minutes, checks the battery before starting WiFi, and goes
+back to sleep until the battery reaches `BATT_RESUME_V` (3.6 V). Then it
+boots normally, and its readings carry `reset_reason=deep_sleep`. Any other
+boot, including the reset button, only needs 3.3 V. No readings are taken
+while it sleeps, and rain and wind aren't counted. A `batt_v` of `unknown`
+(wire off) never counts as low. The thresholds are approximate:
+`BATT_DIVIDER_RATIO` was calibrated against the charger, not a multimeter.
+
 ## Serial output and commands (115200 baud)
 
 - `report ...` every five minutes (ADR 0001 cadence): reading ID, UTC time,
   rain, wind, vane direction, BME680 and PMSA003I fields, battery and charge state, and
   RSSI (see docs/sensors.md). Invalid sensor states print explicitly
   (`bme680=error`, `pmsa003i=error`, `wind_dir_deg=unknown`, `batt_v=unknown`,
-  `time=unsynced`) instead of fabricated values.
+  `time=unsynced`) instead of fabricated values. `pmsa003i=skipped` means the
+  window closed before the PMSA003I was read (e.g. an early `s`); it is sent
+  as `"pmsa003i": null`.
 - `upload: id=... ok (201) queued=N` as each reading is delivered, oldest
   first. `200` means the server already had that reading (a retry after a
   lost response). `FAILED code=N, retry in S s` keeps the reading queued and
@@ -154,7 +183,10 @@ Boot prints `cpu: 80 MHz`.
 - Commands: `s` = print a sample report now (resets the window) and queue
   it, `q` = upload queue status (depth, dropped, rejected, failures, next
   retry), `c` = toggle the calibration stream (raw vane ADC and heading),
-  `i` = scan the I2C bus and list the addresses that answer, `x` = hang on purpose to test the watchdog, `h` = help.
+  `i` = scan the I2C bus and list the addresses that answer, `p` = wake the
+  PMSA003I now to check the fan and its I2C link (it runs until the window
+  closes, so `s` stops it at once), `x` = hang on purpose to test the
+  watchdog, `h` = help.
 
 ## Watchdog and recovery (JAE-62)
 

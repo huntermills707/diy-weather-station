@@ -5,7 +5,7 @@
 
 bool readingToJson(const Reading& r, const char* stationId, char* buf, size_t len) {
     bool bmeOk = strcmp(r.bme680, "ok") == 0;
-    bool pmOk = strcmp(r.pmsa003i, "ok") == 0;
+    bool pmOk = r.pmsa003i != nullptr && strcmp(r.pmsa003i, "ok") == 0;
 
     // Optional values are formatted first so the main printf stays readable.
     // Invalid states become JSON null, never a placeholder number.
@@ -19,6 +19,7 @@ bool readingToJson(const Reading& r, const char* stationId, char* buf, size_t le
     char pm[320];
     char rssi[8] = "null";
     char battV[8] = "null";
+    char pmStatus[16] = "null";
     if (r.deviceTime[0] != '\0') {
         snprintf(deviceTime, sizeof(deviceTime), "\"%s\"", r.deviceTime);
     }
@@ -49,6 +50,9 @@ bool readingToJson(const Reading& r, const char* stationId, char* buf, size_t le
                  "\"particles_03um\":null,\"particles_05um\":null,\"particles_1um\":null,"
                  "\"particles_25um\":null,\"particles_5um\":null,\"particles_10um\":null");
     }
+    if (r.pmsa003i != nullptr) {
+        snprintf(pmStatus, sizeof(pmStatus), "\"%s\"", r.pmsa003i);
+    }
     if (r.rssiValid) {
         snprintf(rssi, sizeof(rssi), "%d", r.rssiDbm);
     }
@@ -61,12 +65,12 @@ bool readingToJson(const Reading& r, const char* stationId, char* buf, size_t le
                      "\"uptime_ms\":%lu,\"window_s\":%lu,\"rain_tips\":%lu,\"rain_mm\":%.2f,"
                      "\"wind_avg_kmh\":%.1f,\"wind_peak_kmh\":%.1f,\"wind_dir_deg\":%s,"
                      "\"temp_c\":%s,\"rh_pct\":%s,\"press_hpa\":%s,\"bme680\":\"%s\","
-                     "\"gas_kohm\":%s,\"pmsa003i\":\"%s\",%s,"
+                     "\"gas_kohm\":%s,\"pmsa003i\":%s,%s,"
                      "\"rssi_dbm\":%s,\"boot_count\":%lu,\"reset_reason\":\"%s\","
                      "\"queue_dropped\":%lu,\"batt_v\":%s,\"charge_state\":\"%s\"}",
                      stationId, r.readingId, deviceTime, (unsigned long)r.uptimeMs,
                      (unsigned long)r.windowS, (unsigned long)r.rainTips, r.rainMm, r.windAvgKmh,
-                     r.windPeakKmh, windDir, tempC, rhPct, pressHpa, r.bme680, gasKohm, r.pmsa003i,
+                     r.windPeakKmh, windDir, tempC, rhPct, pressHpa, r.bme680, gasKohm, pmStatus,
                      pm, rssi, (unsigned long)r.bootCount, r.resetReason,
                      (unsigned long)r.queueDropped, battV, r.chargeState);
     return n > 0 && (size_t)n < len;

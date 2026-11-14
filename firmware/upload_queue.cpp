@@ -96,6 +96,8 @@ void uploadQueuePoll() {
     }
 }
 
+void uploadQueueSendNow() { nextSendAt = millis(); }
+
 size_t uploadQueueDepth() { return count; }
 
 uint32_t uploadQueueDropped() { return dropped; }
