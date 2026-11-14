@@ -3,6 +3,7 @@
 #include <Preferences.h>
 #include <Wire.h>
 #include <esp_random.h>
+#include <esp_sleep.h>
 #include <esp_task_wdt.h>
 
 #include "network.h"
@@ -47,6 +48,13 @@ uint32_t readingSeq = 0;
 // server: a lifetime boot counter kept in flash, and why this boot happened.
 uint32_t bootCount = 0;
 const char* resetReason = "unknown";
+
+// In RTC memory, so it survives deep sleep: true while the station is
+// sleeping through a low battery, so a timer wake checks against
+// BATT_RESUME_V rather than BATT_SLEEP_V. Only trusted on a deep-sleep wake;
+// any other boot (power-on, reset button, watchdog) uses BATT_SLEEP_V.
+RTC_DATA_ATTR bool lowBattSleeping = false;
+uint32_t lowBattStreak = 0;  // readings in a row below BATT_SLEEP_V
 
 uint32_t nextWindowAt = 0;
 uint32_t nextWindPrintAt = 0;
@@ -149,7 +157,13 @@ static Reading takeReading() {
     }
 
     r.pm = particulatesTakeWindow();
-    r.pmsa003i = r.pm.samples > 0 ? "ok" : "error";
+    // Not asked this window (cut short before the burst's read phase): no
+    // status rather than "error".
+    if (r.pm.attempted) {
+        r.pmsa003i = r.pm.samples > 0 ? "ok" : "error";
+    } else {
+        r.pmsa003i = nullptr;
+    }
 
     r.rssiValid = networkConnected();
     r.rssiDbm = r.rssiValid ? networkRssi() : 0;
@@ -183,11 +197,11 @@ static void printReading(const Reading& r) {
         }
     }
     Serial.printf("bme680=%s ", r.bme680);
-    if (strcmp(r.pmsa003i, "ok") == 0) {
+    if (r.pmsa003i != nullptr && strcmp(r.pmsa003i, "ok") == 0) {
         Serial.printf("pm1=%.1f pm25=%.1f pm10=%.1f pm_samples=%lu ", r.pm.pm1Ugm3, r.pm.pm25Ugm3,
                       r.pm.pm10Ugm3, (unsigned long)r.pm.samples);
     }
-    Serial.printf("pmsa003i=%s ", r.pmsa003i);
+    Serial.printf("pmsa003i=%s ", r.pmsa003i != nullptr ? r.pmsa003i : "skipped");
     if (r.battV >= 0.0f) {
         Serial.printf("batt_v=%.2f ", r.battV);
     } else {
@@ -200,17 +214,56 @@ static void printReading(const Reading& r) {
     Serial.println();
 }
 
+// Deep-sleeps until the timer wakes the board, which then boots afresh
+// through setup(). Never returns.
+static void sleepForLowBattery(float volts) {
+    lowBattSleeping = true;
+    particulatesSleep();  // the SET pull-down keeps it off while asleep
+    Serial.printf("power: battery %.2f V: deep sleep for %lu min (resumes at %.2f V)\n", volts,
+                  (unsigned long)LOW_BATT_WAKE_MIN, BATT_RESUME_V);
+    Serial.flush();
+    esp_sleep_enable_timer_wakeup((uint64_t)LOW_BATT_WAKE_MIN * 60ULL * 1000000ULL);
+    esp_deep_sleep_start();
+}
+
+// Tries to upload what is queued, for at most LOW_BATT_FLUSH_MS, so the
+// server gets the last readings (and their batt_v) before the station goes
+// quiet.
+static void flushUploads() {
+    uint32_t start = millis();
+    while (uploadQueueDepth() > 0 && millis() - start < LOW_BATT_FLUSH_MS) {
+        esp_task_wdt_reset();
+        networkPoll();
+        uploadQueuePoll();
+        delay(50);
+    }
+    if (uploadQueueDepth() > 0) {
+        Serial.printf("power: %lu queued reading(s) not sent, lost in deep sleep\n",
+                      (unsigned long)uploadQueueDepth());
+    }
+}
+
+// A battery reading of -1 (implausible, e.g. the V_BAT wire is off) is not a
+// low battery.
+static bool batteryLow(float volts, float threshold) { return volts >= 0.0f && volts < threshold; }
+
 static void report() {
     Reading r = takeReading();
     printReading(r);
     // Sent by uploadQueuePoll(), right away unless older readings are waiting.
     uploadQueuePush(r);
+
+    lowBattStreak = batteryLow(r.battV, BATT_SLEEP_V) ? lowBattStreak + 1 : 0;
+    if (lowBattStreak >= LOW_BATT_READINGS) {
+        flushUploads();
+        sleepForLowBattery(r.battV);
+    }
 }
 
 static void printHelp() {
     Serial.println(
         "commands: s=sample report now, q=upload queue status, c=toggle calibration stream, "
-        "i=I2C bus scan, x=hang (watchdog test), h=help");
+        "i=I2C bus scan, p=wake the PMSA003I now (fan test), x=hang (watchdog test), h=help");
 }
 
 static void scanI2c() {
@@ -249,6 +302,9 @@ static void handleSerial() {
             case 'i':
                 scanI2c();
                 break;
+            case 'p':
+                particulatesWakeNow();
+                break;
             case 'x':
                 // Stops loop() so the watchdog fires; the next boot reports
                 // reset_reason=task_watchdog.
@@ -270,6 +326,22 @@ void setup() {
     Serial.begin(115200);
     delay(1000);  // let USB-serial settle before first print
     Serial.println("weather station firmware up");
+    particulatesInit();  // fan off
+    powerInit();
+
+    // Low-battery gate, before WiFi and its current spikes: a boot on a weak
+    // battery goes straight back to sleep. After a low-battery sleep the bar
+    // is the higher BATT_RESUME_V.
+    bool resuming = lowBattSleeping && esp_reset_reason() == ESP_RST_DEEPSLEEP;
+    float volts = batteryVolts();
+    if (batteryLow(volts, resuming ? BATT_RESUME_V : BATT_SLEEP_V)) {
+        sleepForLowBattery(volts);
+    }
+    if (resuming) {
+        Serial.printf("power: battery %.2f V, resuming after low-battery sleep\n", volts);
+    }
+    lowBattSleeping = false;
+
     bootCount = countBoot();
     resetReason = resetReasonText(esp_reset_reason());
     Serial.printf("boot #%lu, reset reason %s\n", (unsigned long)bootCount, resetReason);
@@ -278,9 +350,7 @@ void setup() {
 
     Wire.begin();
     beginBme680();
-    particulatesInit();
     weatherMetersInit();
-    powerInit();
 
     networkInit();
     // After networkInit: with the radio on, esp_random() is a true RNG.
@@ -301,7 +371,7 @@ void loop() {
     handleSerial();
     networkPoll();
     uploadQueuePoll();
-    particulatesPoll();
+    particulatesPoll(nextWindowAt);
 
     uint32_t rainNow = rainTipsTotal();
     if (rainNow != lastRainSeen) {

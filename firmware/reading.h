@@ -22,7 +22,7 @@ struct Reading {
     float rhPct;
     float pressHpa;
     float gasKohm;         // < 0 when the gas heater was not stable; valid only when bme680 is "ok"
-    const char* pmsa003i;  // "ok" or "error" (no sample all window)
+    const char* pmsa003i;  // "ok", "error" (no sample in the burst), or nullptr (not sampled)
     ParticulateWindow pm;  // valid only when pmsa003i is "ok"
     bool rssiValid;
     int rssiDbm;

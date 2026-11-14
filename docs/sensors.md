@@ -43,10 +43,10 @@ script (`scripts/serial_capture.py`) prefixes every line with host UTC time.
 | `press_hpa` | hPa | BME680 | Station pressure (not sea-level corrected) |
 | `gas_kohm` | kΩ | BME680 | Gas (VOC) sensor resistance, heater at 320 °C for 150 ms. Lower means more VOCs; a trend, not a calibrated value. `unknown` when the heater did not reach temperature |
 | `bme680` | — | BME680 | `ok`, `implausible` (out-of-range values suppressed), or `error` (no I2C response; retried each report) |
-| `pm1` / `pm25` / `pm10` | µg/m³ | PMSA003I | PM1.0, PM2.5 and PM10 mass ("environmental" values), averaged over the window. Sent as `pm1_ugm3`, `pm25_ugm3`, `pm10_ugm3` |
-| `pm_samples` | count | PMSA003I | Samples averaged: one every 10 s, so ~30 per window. Serial only |
-| — | per 0.1 L | PMSA003I | Particles above 0.3, 0.5, 1, 2.5, 5 and 10 µm, averaged over the window. Sent only, as `particles_03um` … `particles_10um` |
-| `pmsa003i` | — | PMSA003I | `ok`, or `error` (not one good sample in the window; the sensor is probed again every 10 s) |
+| `pm1` / `pm25` / `pm10` | µg/m³ | PMSA003I | PM1.0, PM2.5 and PM10 mass ("environmental" values), averaged over the burst at the end of the window. Sent as `pm1_ugm3`, `pm25_ugm3`, `pm10_ugm3` |
+| `pm_samples` | count | PMSA003I | Samples averaged: one every 2 s over the last 10 s of the window, so ~5. Serial only |
+| — | per 0.1 L | PMSA003I | Particles above 0.3, 0.5, 1, 2.5, 5 and 10 µm, averaged over the burst. Sent only, as `particles_03um` … `particles_10um` |
+| `pmsa003i` | — | PMSA003I | `ok`, `error` (awake but not one good sample in the burst; probed again in the next burst), or `skipped` (the window closed before the burst read it, e.g. an early `s`; sent as null) |
 | `batt_v` | V | Charger V_BAT | 16 calibrated ADC reads × `BATT_DIVIDER_RATIO`; `unknown` outside 2.5-4.5 V (wire off) |
 | `charge` | — | Charger CHRG/DONE | `charging` (only CHRG low), `full` (only DONE low), or `idle` (no solar input, e.g. night: the charger powers its status pull-ups from the panel, so both lines read low). Sent as `charge_state` |
 | `rssi_dbm` | dBm | WiFi | Signal strength; omitted while WiFi is down |
@@ -67,9 +67,13 @@ Fixed sampling behaviour (in `weather_meters.cpp`, not expected to change):
 rain debounce 100 ms (bench-measured settle edges at 18-34 ms after a tip),
 wind debounce 5 ms, vane averaged over 8 ADC reads.
 
-Air quality (in `particulates.cpp` and `firmware.ino`): the PMSA003I is
-sampled every 10 s, starting 30 s after boot (its warm-up), and its fan
-runs all the time (about 100 mA) because the SET sleep pin is not wired.
+Air quality (in `particulates.cpp` and `firmware.ino`): the PMSA003I's fan
+draws about 100 mA, so the sensor sleeps for most of each window (JAE-81).
+It wakes 40 s before the window closes, warms up for 30 s (the datasheet
+minimum for stable readings, which also flushes the chamber with fresh
+air), and is sampled every 2 s for the last 10 s. The fan runs about 13% of
+the time. A reading is therefore the last 10 s of the window, not a
+five-minute average.
 The BME680 gas heater runs only for each five-minute measurement, so its
 self-heating of the temperature reading is negligible. No IAQ index is
 computed (Bosch's BSEC library is closed source); an air quality index from
