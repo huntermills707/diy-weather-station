@@ -230,6 +230,9 @@ static void sleepForLowBattery(float volts) {
 // server gets the last readings (and their batt_v) before the station goes
 // quiet.
 static void flushUploads() {
+    // A failed send may have set the next retry minutes away, longer than
+    // this flush: try once now instead. A new failure backs off as usual.
+    uploadQueueSendNow();
     uint32_t start = millis();
     while (uploadQueueDepth() > 0 && millis() - start < LOW_BATT_FLUSH_MS) {
         esp_task_wdt_reset();

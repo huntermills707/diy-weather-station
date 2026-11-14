@@ -32,6 +32,11 @@ void uploadQueuePush(const Reading& r);
 // Call every loop(): sends at most one reading (the oldest) when it is due.
 void uploadQueuePoll();
 
+// Ends any retry wait, so the next uploadQueuePoll() with WiFi up sends at
+// once: for a last attempt before deep sleep, which empties the queue. It
+// clears one wait only: a failed send sets the backoff again as usual.
+void uploadQueueSendNow();
+
 size_t uploadQueueDepth();
 
 // Readings dropped because the queue was full, since boot.
